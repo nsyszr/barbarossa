@@ -46,7 +46,7 @@ file(GLOB SOURCES "src/*.cpp")
 
 # JSON
 set(JSON_BuildTests OFF CACHE INTERNAL "")
-add_subdirectory(thirdparty/nlohmann/json)
+add_subdirectory(thirdparty/json)
 
 # Websocketpp
 set(THREADS_PREFER_PTHREAD_FLAG ON)
