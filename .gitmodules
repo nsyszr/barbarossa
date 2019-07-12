@@ -1,3 +1,12 @@
 [submodule "thirdparty/nlohmann/json"]
 	path = thirdparty/nlohmann/json
 	url = https://github.com/nlohmann/json.git
+
+[submodule "thirdparty/websocketpp"]
+	path = thirdparty/websocketpp
+	url = https://github.com/zaphoyd/websocketpp.git
+
+[submodule "thirdparty/asio"]
+	path = thirdparty/asio
+	url = https://github.com/chriskohlhoff/asio.git
+	branch = asio-1-12-branch

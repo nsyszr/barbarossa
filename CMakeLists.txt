@@ -49,11 +49,11 @@ set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(thirdparty/nlohmann/json)
 
 # Websocketpp
-#set(THREADS_PREFER_PTHREAD_FLAG ON)
-#find_package(Threads REQUIRED)
-#include_directories(thirdparty/websocketpp)
-#include_directories(thirdparty/asio-1.12.2/include)
-#add_subdirectory(thirdparty/websocketpp)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+include_directories(thirdparty/websocketpp)
+include_directories(thirdparty/asio/asio/include)
+add_subdirectory(thirdparty/websocketpp)
 
 # spdlog
 #include_directories(thirdparty/spdlog/include)
@@ -63,4 +63,4 @@ add_subdirectory(thirdparty/nlohmann/json)
 add_executable(barbarossa ${SOURCES})
 # absl::base absl::memory 
 #target_link_libraries(learncpp Threads::Threads absl::memory nlohmann_json::nlohmann_json)
-target_link_libraries(barbarossa nlohmann_json::nlohmann_json)
+target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json)

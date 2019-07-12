@@ -2,6 +2,7 @@
 #include <string>
 
 #include "protocol.hpp"
+#include "websocket.hpp"
 
 #include "nlohmann/json.hpp"
 
@@ -37,13 +38,7 @@ int main() {
   using json = nlohmann::json;
   using namespace iotcore::devicecontrol::v1::protocol;
 
-  /*auto j = json::parse(
-      "[2, 293847, {\"session_timeout\": 3600, \"ping_interval\": 3584, "
-      "\"pong_max_wait_time\": 16, \"events_topic\": \"devices::events\"}]");
-  std::cout << j << std::endl; */
-
-
-  // auto msg = hellomessage::HelloMessage{"test@test"};
+  /*// auto msg = hellomessage::HelloMessage{"test@test"};
   auto msg = HelloMessage("test@test");
   json j = msg;
 
@@ -66,7 +61,12 @@ int main() {
   std::cout << msg3.realm() << ", " << msg3.details() << std::endl;
 
   std::cout << msg4.realm() << ", " << msg4.details() << std::endl;
-  auto details = msg4.details<details::Details>();
+  auto details = msg4.details<details::Details>();*/
+
+  std::string uri = "ws://localhost:4001/devicecontrol/v1";
+  WebsocketEndpoint endpoint;
+
+  endpoint.Run(uri);
 
   return 0;
 }
