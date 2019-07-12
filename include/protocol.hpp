@@ -5,12 +5,13 @@
 #define PROTOCOL_HPP_
 
 #include <string>
+#include <string_view>
 
 #include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
-namespace iotcore::devicecontrol::v1::protocol {
+namespace barbarossa::controlchannel::v1::protocol {
 
 enum MessageTypes {
   kMessageTypeInvalid = 0,
@@ -21,8 +22,32 @@ enum MessageTypes {
   kMessageTypePong = 5,
 };
 
-namespace hellomessage {
+class BasicMessage {
+  json j_;
+  friend BasicMessage Parse(const std::string_view& s);
 
+  // Hide the constructor
+  BasicMessage() {}
+  BasicMessage(const json& j) : j_(j) {}
+
+ public:
+  MessageTypes GetMessageType() {
+    MessageTypes msg_type = j_[0];
+    return msg_type;
+  }
+
+  template <typename T>
+  T Get() {
+    return j_.get<T>();
+  }
+};
+
+BasicMessage Parse(const std::string_view& s) {
+  auto j = json::parse(s);
+  return BasicMessage{j};
+}
+
+namespace hellomessage {
 // The representation of the websocket hello message (message type 1).
 class HelloMessage {
   std::string realm_;
@@ -354,6 +379,6 @@ pongmessage::PongMessage PongMessage(const T& details) {
   return pongmessage::PongMessage(details);
 }
 
-}  // namespace iotcore::devicecontrol::v1::protocol
+}  // namespace barbarossa::controlchannel::v1::protocol
 
 #endif  // PROTOCOL_HPP_

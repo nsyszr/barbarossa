@@ -34,9 +34,9 @@ void from_json(const json& j, Details& details) {
 
 }  // namespace details
 
-int main() {
+int main(int argc, char* argv[]) {
   using json = nlohmann::json;
-  using namespace iotcore::devicecontrol::v1::protocol;
+  using namespace barbarossa::controlchannel::v1::protocol;
 
   /*// auto msg = hellomessage::HelloMessage{"test@test"};
   auto msg = HelloMessage("test@test");
@@ -63,7 +63,9 @@ int main() {
   std::cout << msg4.realm() << ", " << msg4.details() << std::endl;
   auto details = msg4.details<details::Details>();*/
 
-  std::string uri = "ws://localhost:4001/devicecontrol/v1";
+  // std::string uri = "ws://localhost:4001/devicecontrol/v1";
+  std::string uri = argv[1];
+  std::cout << "Connecting " << uri << std::endl;
   WebsocketEndpoint endpoint;
 
   endpoint.Run(uri);
