@@ -19,13 +19,21 @@
 
 using namespace iotcore::devicecontrol::v1;
 
+enum ControlChannelStates {
+  kControlChannelStateOpen = 0,
+  kControlChannelStateConnected = 1,
+  kControlChannelStateGreeted = 2,
+  kControlChannelStateRegistered = 3,
+  kControlChannelStateDisconnected = 4,
+};
+
 class WebsocketEndpoint {
  public:
   typedef websocketpp::client<websocketpp::config::asio_client> client;
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
-  WebsocketEndpoint() : open_(false), done_(false), registered_(false) {
+  WebsocketEndpoint() : state_(kControlChannelStateOpen) {
     endpoint_.clear_access_channels(websocketpp::log::alevel::all);
     endpoint_.set_access_channels(websocketpp::log::alevel::connect);
     endpoint_.set_access_channels(websocketpp::log::alevel::disconnect);
@@ -50,7 +58,8 @@ class WebsocketEndpoint {
   ~WebsocketEndpoint() {
     endpoint_.stop_perpetual();
 
-    if (!done_) {
+    // Close the connection graceful if it's still open
+    if (GetSafeState() != kControlChannelStateDisconnected) {
       std::cout << "> Closing connection " << std::endl;
 
       websocketpp::lib::error_code ec;
@@ -102,8 +111,7 @@ class WebsocketEndpoint {
         websocketpp::log::alevel::app,
         "Connection opened, starting control channel client!");
 
-    scoped_lock guard(lock_);
-    open_ = true;
+    SetSafeState(kControlChannelStateConnected);
   }
 
   // The close handler will signal that we should stop sending telemetry
@@ -111,9 +119,7 @@ class WebsocketEndpoint {
     endpoint_.get_alog().write(
         websocketpp::log::alevel::app,
         "Connection closed, stopping control channel client!");
-
-    scoped_lock guard(lock_);
-    done_ = true;
+    SetSafeState(kControlChannelStateDisconnected);
   }
 
   // The fail handler will signal that we should stop sending telemetry
@@ -121,9 +127,7 @@ class WebsocketEndpoint {
     endpoint_.get_alog().write(
         websocketpp::log::alevel::app,
         "Connection failed, stopping control channel client!");
-
-    scoped_lock guard(lock_);
-    done_ = true;
+    SetSafeState(kControlChannelStateDisconnected);
   }
 
   void OnMessage(websocketpp::connection_hdl hdl, message_ptr msg) {
@@ -132,10 +136,12 @@ class WebsocketEndpoint {
 
     auto j = json::parse(msg->get_payload());
 
-    scoped_lock guard(lock_);
-    if (!registered_) {
-      auto welcome_msg = j.get<protocol::welcomemessage::WelcomeMessage>();
-      registered_ = true;
+    switch (GetSafeState()) {
+      case kControlChannelStateGreeted: {
+        // We expect a hello or abort message now before we change the state
+        auto welcome_msg = j.get<protocol::welcomemessage::WelcomeMessage>();
+        SetSafeState(kControlChannelStateRegistered);
+      } break;
     }
 
     /* websocketpp::lib::error_code ec;
@@ -147,47 +153,37 @@ class WebsocketEndpoint {
   }
 
   void Handler() {
-    int seconds = 0;
+    int timeout = 0;
+    bool done = false;
     websocketpp::lib::error_code ec;
-    bool send_hello = false;
 
     while (1) {
-      bool wait = false;
+      // Processing
+      switch (GetSafeState()) {
+        case kControlChannelStateOpen: {
+          // Do nothing, we're waiting another second until it's connected
+        } break;
+        case kControlChannelStateConnected: {
+          json j = protocol::HelloMessage("barbarossa@test");
+          endpoint_.send(hdl_, j.dump(), websocketpp::frame::opcode::text, ec);
 
-      // Control the current connection
-      {
-        scoped_lock guard(lock_);
-
-        // If connection gone stop the handler
-        if (done_) {
+          SetSafeState(kControlChannelStateGreeted);
+        } break;
+        case kControlChannelStateRegistered: {
+          if (timeout == 30) {
+            json j = protocol::PingMessage();
+            endpoint_.send(hdl_, j.dump(), websocketpp::frame::opcode::text,
+                           ec);
+            timeout = 0;
+          } else {
+            timeout++;
+          }
+        } break;
+        case kControlChannelStateDisconnected: {
           endpoint_.get_alog().write(
               websocketpp::log::alevel::app,
               "Control Channel was closed, leave the handler");
-          break;
-        }
-
-        if (!open_) {
-          wait = true;
-        }
-      }
-
-      if (wait) {
-        sleep(1);
-        continue;
-      }
-
-      // Processing
-      if (!send_hello) {
-        json j = protocol::HelloMessage("barbarossa@test");
-        endpoint_.send(hdl_, j.dump(), websocketpp::frame::opcode::text, ec);
-        send_hello = true;
-      } else if (registered_) {
-        if (seconds == 30) {
-          json j = protocol::PingMessage();
-          endpoint_.send(hdl_, j.dump(), websocketpp::frame::opcode::text, ec);
-          seconds = 0;
-        } else {
-          seconds++;
+          done = true;
         }
       }
 
@@ -198,6 +194,10 @@ class WebsocketEndpoint {
         break;
       }
 
+      // Leave the handler if we're done
+      if (done) {
+        break;
+      }
       sleep(1);
     }
   }
@@ -207,9 +207,22 @@ class WebsocketEndpoint {
   websocketpp::lib::mutex lock_;
   websocketpp::connection_hdl hdl_;
   websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
-  bool open_;
-  bool done_;
-  bool registered_;
+  ControlChannelStates state_;
+  // bool open_;
+  // bool done_;
+  // bool registered_;
+
+  ControlChannelStates GetSafeState() {
+    scoped_lock guard(lock_);
+    return state_;
+  }
+
+  void SetSafeState(ControlChannelStates state) {
+    scoped_lock guard(lock_);
+    std::cout << "State transition from " << state_ << " to " << state
+              << std::endl;
+    state_ = state;
+  }
 };
 
 #endif  // WEBSOCKET_HPP_

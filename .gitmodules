@@ -1,10 +1,13 @@
 [submodule "thirdparty/websocketpp"]
 	path = thirdparty/websocketpp
 	url = https://github.com/zaphoyd/websocketpp.git
+	ignore = dirty
 [submodule "thirdparty/asio"]
 	path = thirdparty/asio
 	url = https://github.com/chriskohlhoff/asio.git
+	ignore = dirty
 	branch = asio-1-12-branch
 [submodule "thirdparty/json"]
 	path = thirdparty/json
 	url = https://github.com/nlohmann/json.git
+	ignore = dirty
