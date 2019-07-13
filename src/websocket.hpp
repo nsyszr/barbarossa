@@ -16,6 +16,8 @@
 #include "websocketpp/common/memory.hpp"
 #include "websocketpp/common/thread.hpp"
 #include "websocketpp/config/asio_no_tls_client.hpp"
+#include "zmq.hpp"
+#include "zmq_addon.hpp"
 
 using namespace barbarossa::controlchannel::v1;
 using json = nlohmann::json;
@@ -34,7 +36,10 @@ class WebsocketEndpoint {
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
-  WebsocketEndpoint() : state_(kControlChannelStateOpen) {
+  WebsocketEndpoint()
+      : state_(kControlChannelStateOpen),
+        context_(1),
+        socket_(context_, ZMQ_REQ) {
     endpoint_.clear_access_channels(websocketpp::log::alevel::all);
     endpoint_.set_access_channels(websocketpp::log::alevel::connect);
     endpoint_.set_access_channels(websocketpp::log::alevel::disconnect);
@@ -54,6 +59,8 @@ class WebsocketEndpoint {
 
     endpoint_.start_perpetual();
     thread_.reset(new websocketpp::lib::thread(&client::run, &endpoint_));
+
+    socket_.bind("inproc://step3");
   }
 
   ~WebsocketEndpoint() {
@@ -228,6 +235,8 @@ class WebsocketEndpoint {
   websocketpp::connection_hdl hdl_;
   websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
   ControlChannelStates state_;
+  zmq::context_t context_;
+  zmq::socket_t socket_;
 
   // private accessors
   ControlChannelStates state() {

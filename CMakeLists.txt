@@ -1,5 +1,5 @@
 # Specify the minimum version for CMake
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 # Project's name
 project(barbarossa)
@@ -59,8 +59,30 @@ add_subdirectory(thirdparty/websocketpp)
 #include_directories(thirdparty/spdlog/include)
 #add_subdirectory(thirdparty/spdlog)
 
-# Our target
+# libzmq
+set(WITH_PERF_TOOL OFF)
+set(ZMQ_BUILD_TESTS OFF)
+set(ENABLE_CPACK OFF)
+include_directories(thirdparty/libzmq/include)
+add_subdirectory(thirdparty/libzmq build/thirdparty/libzmq)
+add_library(zmq STATIC build/thirdparty/libzmq)
+set_target_properties(zmq PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(zmq PUBLIC thirdparty/libzmq/include)
+
+# NOTE: You have to run make in build dir manually !
+
+#add_custom_target(zmq COMMAND make thirdparty/libzmq/build)
+add_library(libzmqxx STATIC IMPORTED)
+set_property(TARGET libzmqxx PROPERTY IMPORTED_LOCATION build/thirdparty/libzmq/lib/libzmq.a)
+
+# cppzmq
+include_directories(thirdparty/cppzmq)
+#add_subdirectory(thirdparty/cppzmq)
+
+#
+# Target Builds
+#
+
+# barbarossa
 add_executable(barbarossa ${SOURCES})
-# absl::base absl::memory 
-#target_link_libraries(learncpp Threads::Threads absl::memory nlohmann_json::nlohmann_json)
-target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json)
+target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmqxx)
