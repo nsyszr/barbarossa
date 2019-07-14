@@ -1,10 +1,10 @@
-#include <iostream>
-#include <string>
-
 #include "protocol.hpp"
 #include "websocket.hpp"
 
 #include "nlohmann/json.hpp"
+
+#include <iostream>
+#include <string>
 
 namespace details {
 class Details {

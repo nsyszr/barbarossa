@@ -14,12 +14,16 @@ using json = nlohmann::json;
 namespace barbarossa::controlchannel::v1::protocol {
 
 enum MessageTypes {
-  kMessageTypeInvalid = 0,
   kMessageTypeHello = 1,
   kMessageTypeWelcome = 2,
   kMessageTypeAbort = 3,
   kMessageTypePing = 4,
   kMessageTypePong = 5,
+  kMessageTypeError = 9,
+  kMessageTypeCall = 10,
+  kMessageTypeResult = 11,
+  kMessageTypePublish = 20,
+  kMessageTypePublished = 21,
 };
 
 class BasicMessage {
@@ -377,6 +381,109 @@ pongmessage::PongMessage PongMessage() { return pongmessage::PongMessage(); }
 template <typename T>
 pongmessage::PongMessage PongMessage(const T& details) {
   return pongmessage::PongMessage(details);
+}
+
+namespace errormessage {
+
+// The representation of the websocket ping message (message type 4).
+class ErrorMessage {
+  MessageTypes request_type_;
+  int32_t request_id_;
+  std::string error_;
+  json details_;
+
+  auto tie() const {
+    return std::tie(request_type_, request_id_, error_, details_);
+  }
+
+  friend void to_json(json& j, const ErrorMessage& msg);
+  friend void from_json(const json& j, ErrorMessage& msg);
+
+ public:
+  ErrorMessage() {}
+  ErrorMessage(MessageTypes request_type, int32_t request_id,
+               const std::string& error)
+      : request_type_(request_type),
+        request_id_(request_id),
+        error_(error),
+        details_(json::object()) {}
+  ErrorMessage(MessageTypes request_type, int32_t request_id,
+               const std::string& error, const json& details)
+      : request_type_(request_type),
+        request_id_(request_id),
+        error_(error),
+        details_(details) {}
+  template <typename T>
+  ErrorMessage(MessageTypes request_type, int32_t request_id,
+               const std::string& error, const T& details)
+      : request_type_(request_type),
+        request_id_(request_id),
+        error_(error),
+        details_(details) {}
+
+  inline bool operator==(const ErrorMessage& rhs) const {
+    return tie() == rhs.tie();
+  }
+
+  // accessors
+  auto request_type() -> MessageTypes { return request_type_; }
+  auto request_id() -> int32_t { return request_id_; }
+  auto error() -> const std::string& { return error_; }
+  auto details() -> const json& { return details_; }
+  template <typename T>
+  auto details() const {
+    return details_.get<T>();
+  }
+
+  // mutators
+  void set_request_type(MessageTypes request_type) {
+    request_type_ = request_type;
+  }
+  void set_request_id(int32_t request_id) { request_id_ = request_id; }
+  void set_error(const std::string& error) { error_ = error; }
+  void set_details(const json& details) { details_ = details; }
+  template <typename T>
+  void set_details(const T& details) {
+    details_ = details;
+  }
+};
+
+void to_json(json& j, const ErrorMessage& msg) {
+  j.push_back(kMessageTypeError);
+  j.push_back(msg.request_type_);
+  j.push_back(msg.request_id_);
+  j.push_back(msg.error_);
+  j.push_back(msg.details_);
+}
+
+void from_json(const json& j, ErrorMessage& msg) {
+  // j.at("name").get_to(p.name);
+  msg.request_type_ = j[1];
+  msg.request_id_ = j[2];
+  msg.error_ = j[3];
+  msg.details_ = j[4];
+
+  if (msg.details_.is_null()) {
+    msg.details_ = json::object();
+  }
+}
+
+}  // namespace errormessage
+
+// Returns an instance of errormessage::ErrorMessage with values.
+errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
+                                        int32_t request_id,
+                                        const std::string& error) {
+  return errormessage::ErrorMessage(request_type, request_id, error);
+}
+
+// Returns an instance of errormessage::ErrorMessage with values and details.
+template <typename T>
+errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
+                                        int32_t request_id,
+                                        const std::string& error,
+                                        const T& details) {
+  return errormessage::ErrorMessage(request_type, request_id, error, details);
 }
 
 }  // namespace barbarossa::controlchannel::v1::protocol
