@@ -142,6 +142,8 @@ void SendEvents(zmq::context_t& context) {
       return;
     }
   }
+
+  spdlog::debug("End of SendEvents.");
 }
 
 int main(int argc, char* argv[]) {
