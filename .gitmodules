@@ -17,3 +17,6 @@
 [submodule "thirdparty/cppzmq"]
 	path = thirdparty/cppzmq
 	url = https://github.com/zeromq/cppzmq.git
+[submodule "thirdparty/spdlog"]
+	path = thirdparty/spdlog
+	url = https://github.com/gabime/spdlog.git

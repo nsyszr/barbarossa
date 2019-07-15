@@ -1,20 +1,23 @@
 #include "controlchannel.hpp"
 
-#include "nlohmann/json.hpp"
-#include "protocol.hpp"
-#include "zmq.hpp"
-#include "zmq_addon.hpp"
-
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+#include "nlohmann/json.hpp"
+#include "spdlog/spdlog.h"
+#include "zmq_addon.hpp"
+
+#include "protocol.hpp"
 
 using json = nlohmann::json;
 
 namespace barbarossa::controlchannel::v1 {
 
 void ControlChannel::HandleStates() {
+  spdlog::debug("Handle state: {}", state_);
+
   switch (state_) {
     case kControlChannelStatePending: {
       // Initial state, open the websocket connection.
@@ -69,6 +72,7 @@ int ControlChannel::EstablishSession() {
   //           run handler waits for a message instead of a while sleep loop.
   if (int rc = con_.SendMessage(j.dump()) != 0) {
     // TODO(DGL) Log error
+    spdlog::error("Failed to send hello message: {}", rc);
     return rc;
   }
 
@@ -78,6 +82,8 @@ int ControlChannel::EstablishSession() {
 }
 
 void ControlChannel::WaitForWelcomeMessageOrDie() {
+  spdlog::debug("Wait for welcome message or die thread started.");
+
   // TODO(DGL) Fix hardcoded timeout
   long timeout_ms = 16000;
 
@@ -97,6 +103,8 @@ void ControlChannel::WaitForWelcomeMessageOrDie() {
     zmq::message_t msg;
     wait_socket.recv(&msg, 0);  // zmq::recv_flags::none
 
+    spdlog::debug(
+        "Got a valid signal. Exit wait for welcome message or die thread.");
     return;  // Exit
   }
 
@@ -111,11 +119,14 @@ void ControlChannel::WaitForWelcomeMessageOrDie() {
 
   request.send(controlchannel_socket);
 
+  spdlog::warn("Wait for welcome message or die thread expired.");
   // return;  // Exit the loop
   //}
 }
 
 void ControlChannel::WaitForPongMessageOrDie() {
+  spdlog::debug("Wait for ping message or die thread started.");
+
   // TODO(DGL) Fixe hardcoded timeout
   long session_timeout_ms = 20000;
   long ping_interval_ms = 16000;
@@ -138,8 +149,15 @@ void ControlChannel::WaitForPongMessageOrDie() {
       wait_socket.recv(&msg, 0);  // zmq::recv_flags::none
       auto payload = std::string(static_cast<char *>(msg.data()), msg.size());
 
+      spdlog::debug("Wait for ping message or die thread got a signal: {}",
+                    payload);
+
       if (payload != "QUIT") {
         // TODO(DGL): Log a warning because of unexpected signal
+        spdlog::warn(
+            "Wait for ping message or die thread got an unexpected signal '{}' "
+            "but expected 'QUIT'.",
+            payload);
       }
       return;  // Exit
     }
@@ -150,6 +168,10 @@ void ControlChannel::WaitForPongMessageOrDie() {
     if (con_.SendMessage(j.dump()) != 0) {
       // TODO(DGL) Log an error
       // Failed to send a ping message. We stop now!
+      spdlog::error(
+          "Wait for ping message or die thread stops. Could not send ping "
+          "message: {}",
+          1);
       return;
     }
 
@@ -164,8 +186,14 @@ void ControlChannel::WaitForPongMessageOrDie() {
       wait_socket.recv(&msg, 0);  // zmq::recv_flags::none
       auto payload = std::string(static_cast<char *>(msg.data()), msg.size());
 
+      spdlog::debug("Wait for ping message or die thread got a signal: {}",
+                    payload);
+
       if (payload != "RESET") {
         // TODO(DGL) Log a warning in case of not QUIT
+        spdlog::debug(
+            "Wait for ping message or die thread got a signal {} and exits.",
+            payload);
         return;
       }
       // We continue looping because we received a pong message
@@ -180,12 +208,15 @@ void ControlChannel::WaitForPongMessageOrDie() {
       request.addtyp<protocol::MessageTypes>(protocol::kMessageTypePing);
 
       request.send(controlchannel_socket);
+
+      spdlog::warn("Wait for ping message or die thread expired.");
       return;
     }
   }
 }
 
 void ControlChannel::TransitionStateTo(ControlChannelStates state) {
+  spdlog::warn("Change state from {} to {}.", state_, state);
   state_ = state;
   HandleStates();
 }
@@ -199,6 +230,7 @@ void ControlChannel::Run() {
 
     // TODO(DGL) Handle exception!
     auto event = request.poptyp<ControlChannelEvents>();
+    spdlog::debug("Received an event: {}", event);
 
     switch (event) {
       case kControlChannelEventOnInterrupt: {
@@ -237,6 +269,9 @@ void ControlChannel::Run() {
 void ControlChannel::HandleMessage(const std::string_view &s) {
   // TODO(DGL) Handle exception!
   auto msg = protocol::Parse(s);
+
+  spdlog::debug("Handle message of type: {}", msg.GetMessageType());
+
   switch (msg.GetMessageType()) {
     case protocol::kMessageTypeWelcome: {
       // Signal WaitForWelcomeMessageOrDie
@@ -299,6 +334,8 @@ void ControlChannel::HandleMessage(const std::string_view &s) {
     case protocol::kMessageTypeResult:
     case protocol::kMessageTypePublish: {
       // not supported messages
+      spdlog::warn("Do not handle Unsupported message of type: {}",
+                   msg.GetMessageType());
       break;
     }
   }

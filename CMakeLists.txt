@@ -56,8 +56,8 @@ include_directories(thirdparty/asio/asio/include)
 add_subdirectory(thirdparty/websocketpp)
 
 # spdlog
-#include_directories(thirdparty/spdlog/include)
-#add_subdirectory(thirdparty/spdlog)
+include_directories(thirdparty/spdlog/include)
+add_subdirectory(thirdparty/spdlog)
 
 # libzmq
 set(WITH_PERF_TOOL OFF)

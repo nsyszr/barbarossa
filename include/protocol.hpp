@@ -46,11 +46,14 @@ class BasicMessage {
   }
 };
 
-BasicMessage Parse(const std::string_view& s) {
+inline BasicMessage Parse(const std::string_view& s) {
   auto j = json::parse(s);
   return BasicMessage{j};
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// HelloMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace hellomessage {
 // The representation of the websocket hello message (message type 1).
 class HelloMessage {
@@ -63,7 +66,7 @@ class HelloMessage {
   friend void from_json(const json& j, HelloMessage& msg);
 
  public:
-  HelloMessage() {}
+  HelloMessage() : details_(json::object()) {}
   explicit HelloMessage(const std::string& realm)
       : realm_(realm), details_(json::object()) {}
   HelloMessage(const std::string& realm, const json& details)
@@ -93,13 +96,13 @@ class HelloMessage {
   }
 };
 
-void to_json(json& j, const HelloMessage& msg) {
+inline void to_json(json& j, const HelloMessage& msg) {
   j.push_back(kMessageTypeHello);
   j.push_back(msg.realm_);
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, HelloMessage& msg) {
+inline void from_json(const json& j, HelloMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.realm_ = j[1];
   msg.details_ = j[2];
@@ -111,19 +114,21 @@ void from_json(const json& j, HelloMessage& msg) {
 
 }  // namespace hellomessage
 
-// Returns an instance of hellomessage::HelloMessage with given realm.
-hellomessage::HelloMessage HelloMessage(const std::string realm) {
+// Returns an instance of hellomessage::HelloMessage
+inline hellomessage::HelloMessage HelloMessage(const std::string realm) {
   return hellomessage::HelloMessage(realm);
 }
 
-// Returns an instance of hellomessage::HelloMessage with given realm and
-// details.
+// Returns an instance of hellomessage::HelloMessage
 template <typename T>
-hellomessage::HelloMessage HelloMessage(const std::string realm,
-                                        const T& details) {
+inline hellomessage::HelloMessage HelloMessage(const std::string realm,
+                                               const T& details) {
   return hellomessage::HelloMessage(realm, details);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// WelcomeMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace welcomemessage {
 
 // The representation of the websocket welcome message (message type 2).
@@ -137,7 +142,7 @@ class WelcomeMessage {
   friend void from_json(const json& j, WelcomeMessage& msg);
 
  public:
-  WelcomeMessage() {}
+  WelcomeMessage() : details_(json::object()) {}
   explicit WelcomeMessage(int32_t session_id)
       : session_id_(session_id), details_(json::object()) {}
   WelcomeMessage(int32_t session_id, const json& details)
@@ -167,13 +172,13 @@ class WelcomeMessage {
   }
 };
 
-void to_json(json& j, const WelcomeMessage& msg) {
+inline void to_json(json& j, const WelcomeMessage& msg) {
   j.push_back(kMessageTypeWelcome);
   j.push_back(msg.session_id_);
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, WelcomeMessage& msg) {
+inline void from_json(const json& j, WelcomeMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.session_id_ = j[1];
   msg.details_ = j[2];
@@ -185,19 +190,21 @@ void from_json(const json& j, WelcomeMessage& msg) {
 
 }  // namespace welcomemessage
 
-// Returns an instance of welcomemessage::WelcomeMessage with given session_id.
-welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id) {
+// Returns an instance of welcomemessage::WelcomeMessage
+inline welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id) {
   return welcomemessage::WelcomeMessage(session_id);
 }
 
-// Returns an instance of welcomemessage::WelcomeMessage with given session_id
-// and details.
+// Returns an instance of welcomemessage::WelcomeMessage
 template <typename T>
-welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id,
-                                              const T& details) {
+inline welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id,
+                                                     const T& details) {
   return welcomemessage::WelcomeMessage(session_id, details);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// AbortMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace abortmessage {
 
 // The representation of the websocket abort message (message type 3).
@@ -211,7 +218,7 @@ class AbortMessage {
   friend void from_json(const json& j, AbortMessage& msg);
 
  public:
-  AbortMessage() {}
+  AbortMessage() : details_(json::object()) {}
   explicit AbortMessage(const std::string& reason)
       : reason_(reason), details_(json::object()) {}
   AbortMessage(const std::string& reason, const json& details)
@@ -241,13 +248,13 @@ class AbortMessage {
   }
 };
 
-void to_json(json& j, const AbortMessage& msg) {
+inline void to_json(json& j, const AbortMessage& msg) {
   j.push_back(kMessageTypeAbort);
   j.push_back(msg.reason_);
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, AbortMessage& msg) {
+inline void from_json(const json& j, AbortMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.reason_ = j[1];
   msg.details_ = j[2];
@@ -259,6 +266,21 @@ void from_json(const json& j, AbortMessage& msg) {
 
 }  // namespace abortmessage
 
+// Returns an instance of abortmessage::AbortMessage
+inline abortmessage::AbortMessage AbortMessage(const std::string& reason) {
+  return abortmessage::AbortMessage(reason);
+}
+
+// Returns an instance of abortmessage::AbortMessage
+template <typename T>
+inline abortmessage::AbortMessage AbortMessage(const std::string& reason,
+                                               const T& details) {
+  return abortmessage::AbortMessage(reason, details);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PingMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace pingmessage {
 
 // The representation of the websocket ping message (message type 4).
@@ -271,8 +293,8 @@ class PingMessage {
   friend void from_json(const json& j, PingMessage& msg);
 
  public:
-  PingMessage() {}
-  PingMessage(const json& details) : details_(details) {}
+  PingMessage() : details_(json::object()) {}
+  explicit PingMessage(const json& details) : details_(details) {}
   template <typename T>
   PingMessage(const T& details) : details_(details) {}
 
@@ -295,12 +317,12 @@ class PingMessage {
   }
 };
 
-void to_json(json& j, const PingMessage& msg) {
+inline void to_json(json& j, const PingMessage& msg) {
   j.push_back(kMessageTypePing);
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, PingMessage& msg) {
+inline void from_json(const json& j, PingMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.details_ = j[1];
 
@@ -311,19 +333,23 @@ void from_json(const json& j, PingMessage& msg) {
 
 }  // namespace pingmessage
 
-// Returns an instance of abortmessage::PingMessage with given reason.
-pingmessage::PingMessage PingMessage() { return pingmessage::PingMessage(); }
+// Returns an instance of pingmessage::PingMessage
+inline pingmessage::PingMessage PingMessage() {
+  return pingmessage::PingMessage();
+}
 
-// Returns an instance of abortmessage::PingMessage with given reason and
-// details.
+// Returns an instance of pingmessage::PingMessage
 template <typename T>
-pingmessage::PingMessage PingMessage(const T& details) {
+inline pingmessage::PingMessage PingMessage(const T& details) {
   return pingmessage::PingMessage(details);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// PingMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace pongmessage {
 
-// The representation of the websocket ping message (message type 4).
+// The representation of the websocket pong message (message type 5).
 class PongMessage {
   json details_;
 
@@ -333,8 +359,8 @@ class PongMessage {
   friend void from_json(const json& j, PongMessage& msg);
 
  public:
-  PongMessage() {}
-  PongMessage(const json& details) : details_(details) {}
+  PongMessage() : details_(json::object()) {}
+  explicit PongMessage(const json& details) : details_(details) {}
   template <typename T>
   PongMessage(const T& details) : details_(details) {}
 
@@ -357,12 +383,12 @@ class PongMessage {
   }
 };
 
-void to_json(json& j, const PongMessage& msg) {
+inline void to_json(json& j, const PongMessage& msg) {
   j.push_back(kMessageTypePing);
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, PongMessage& msg) {
+inline void from_json(const json& j, PongMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.details_ = j[1];
 
@@ -373,19 +399,23 @@ void from_json(const json& j, PongMessage& msg) {
 
 }  // namespace pongmessage
 
-// Returns an instance of abortmessage::PingMessage with given reason.
-pongmessage::PongMessage PongMessage() { return pongmessage::PongMessage(); }
+// Returns an instance of pongmessage::PongMessage
+inline pongmessage::PongMessage PongMessage() {
+  return pongmessage::PongMessage();
+}
 
-// Returns an instance of abortmessage::PingMessage with given reason and
-// details.
+// Returns an instance of pongmessage::PongMessage
 template <typename T>
-pongmessage::PongMessage PongMessage(const T& details) {
+inline pongmessage::PongMessage PongMessage(const T& details) {
   return pongmessage::PongMessage(details);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// ErrorMessage
+////////////////////////////////////////////////////////////////////////////////
 namespace errormessage {
 
-// The representation of the websocket ping message (message type 4).
+// The representation of the websocket error message (message type 9).
 class ErrorMessage {
   MessageTypes request_type_;
   int32_t request_id_;
@@ -400,7 +430,7 @@ class ErrorMessage {
   friend void from_json(const json& j, ErrorMessage& msg);
 
  public:
-  ErrorMessage() {}
+  ErrorMessage() : details_(json::object()) {}
   ErrorMessage(MessageTypes request_type, int32_t request_id,
                const std::string& error)
       : request_type_(request_type),
@@ -448,7 +478,7 @@ class ErrorMessage {
   }
 };
 
-void to_json(json& j, const ErrorMessage& msg) {
+inline void to_json(json& j, const ErrorMessage& msg) {
   j.push_back(kMessageTypeError);
   j.push_back(msg.request_type_);
   j.push_back(msg.request_id_);
@@ -456,7 +486,7 @@ void to_json(json& j, const ErrorMessage& msg) {
   j.push_back(msg.details_);
 }
 
-void from_json(const json& j, ErrorMessage& msg) {
+inline void from_json(const json& j, ErrorMessage& msg) {
   // j.at("name").get_to(p.name);
   msg.request_type_ = j[1];
   msg.request_id_ = j[2];
@@ -470,19 +500,19 @@ void from_json(const json& j, ErrorMessage& msg) {
 
 }  // namespace errormessage
 
-// Returns an instance of errormessage::ErrorMessage with values.
-errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
-                                        int32_t request_id,
-                                        const std::string& error) {
+// Returns an instance of errormessage::ErrorMessage
+inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
+                                               int32_t request_id,
+                                               const std::string& error) {
   return errormessage::ErrorMessage(request_type, request_id, error);
 }
 
-// Returns an instance of errormessage::ErrorMessage with values and details.
+// Returns an instance of errormessage::ErrorMessage
 template <typename T>
-errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
-                                        int32_t request_id,
-                                        const std::string& error,
-                                        const T& details) {
+inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
+                                               int32_t request_id,
+                                               const std::string& error,
+                                               const T& details) {
   return errormessage::ErrorMessage(request_type, request_id, error, details);
 }
 

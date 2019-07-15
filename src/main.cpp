@@ -1,12 +1,23 @@
-#include "protocol.hpp"
-#include "websocket.hpp"
-
-#include "nlohmann/json.hpp"
-
+#include <atomic>
 #include <iostream>
 #include <string>
 
-namespace details {
+#include "spdlog/spdlog.h"
+
+#include "websocket.hpp"
+#include "zmqutils.hpp"
+
+namespace zmqutils = barbarossa::zmqutils;
+
+// std::atomic<bool> quit_signal(false);
+
+namespace {
+volatile std::sig_atomic_t quit_signal;
+}
+
+void signal_handler(int signal) { quit_signal = signal; }
+
+/* namespace details {
 class Details {
   std::string serial_;
 
@@ -32,11 +43,112 @@ void from_json(const json& j, Details& details) {
   j.at("serial_number").get_to(details.serial_);
 }
 
-}  // namespace details
+}  // namespace details */
+
+
+void RunWithTimeout(zmq::context_t& context) {
+  spdlog::debug("Thread started.");
+
+  // TODO(DGL) Fix hardcoded timeout
+  long timeout_ms = 16000;
+
+  try {
+    /* zmq::socket_t wait_socket(*context, ZMQ_PAIR);
+    wait_socket.bind("inproc://runwithtimeout"); */
+    auto socket = zmqutils::Bind(context, "inproc://runwithtimeout", ZMQ_PAIR);
+
+    // while (1) {
+    //  Poll socket for a reply, with timeout
+    zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
+    spdlog::debug("Poll queue.");
+    zmq::poll(&items[0], 1, timeout_ms);
+
+    //  If we got a reply, we can leave the thread without any response
+    if (items[0].revents & ZMQ_POLLIN) {
+      // Receive the message even if we don't handle it. This ensures that the
+      // queue is empty.
+      spdlog::debug("Message is in queue.");
+
+      /*zmq::message_t msg;
+      socket.recv(&msg, 0);  // zmq::recv_flags::none*/
+      auto msg = zmqutils::RecvString(socket);
+
+      spdlog::debug("Got a valid signal '{}'. Exit thread.", msg);
+
+      return;  // Exit
+    }
+  } catch (zmq::error_t& e) {
+    spdlog::error("ZMQ error: {}", e.what());
+  }
+
+  spdlog::debug("Thread expired.");
+}
+
+void ListenEvents(zmq::context_t& context) {
+  spdlog::debug("Start ListenEvents.");
+
+  auto event_socket = zmqutils::Bind(context, "inproc://events", ZMQ_PAIR);
+  // auto quit_socket = zmqutils::Bind(context, "inproc://quit", ZMQ_PAIR);
+
+  /*zmq::pollitem_t items[] = {{event_socket, 0, ZMQ_POLLIN, 0},
+                             {quit_socket, 0, ZMQ_POLLIN, 0}};*/
+
+  while (true) {
+    /*zmq::poll(&items[0], 2, -1);  // Without timeout
+
+    if (items[0].revents & ZMQ_POLLIN) {
+      auto msg = zmqutils::RecvString(event_socket);
+      spdlog::info("event: {}", msg);
+    }
+    if (items[1].revents & ZMQ_POLLIN) {
+      auto msg = zmqutils::RecvString(quit_socket);
+      spdlog::info("quit: {}", msg);
+      spdlog::info("Exit ListenEvents");
+      return;
+    }*/
+
+    try {
+      auto msg = zmqutils::RecvString(event_socket);
+      spdlog::info("event: {}", msg);
+    } catch (zmq::error_t& e) {
+      spdlog::info("interrupt received");
+    }
+    if (quit_signal == SIGINT) {
+      spdlog::info("SIGINT. Exit ListenEvents thread.");
+      return;
+    }
+  }
+}
+
+void SendEvents(zmq::context_t& context) {
+  using namespace std::chrono_literals;
+
+  spdlog::debug("Start SendEvents.");
+
+  auto event_socket = zmqutils::Connect(context, "inproc://events", ZMQ_PAIR);
+
+  for (int i = 0; i < 5; i++) {
+    std::this_thread::sleep_for(2s);
+
+    std::ostringstream ss;
+    ss << "EVENT " << (i + 1);
+    try {
+      zmqutils::SendString(event_socket, ss.str());
+    } catch (zmq::error_t& e) {
+      spdlog::info("interrupt received");
+    }
+    if (quit_signal == SIGINT) {
+      spdlog::info("SIGINT. Exit SendEvents thread.");
+      return;
+    }
+  }
+}
 
 int main(int argc, char* argv[]) {
-  using json = nlohmann::json;
-  using namespace barbarossa::controlchannel::v1::protocol;
+  spdlog::set_level(spdlog::level::debug);
+
+  // using json = nlohmann::json;
+  // using namespace barbarossa::controlchannel::v1::protocol;
 
   /*// auto msg = hellomessage::HelloMessage{"test@test"};
   auto msg = HelloMessage("test@test");
@@ -64,11 +176,54 @@ int main(int argc, char* argv[]) {
   auto details = msg4.details<details::Details>();*/
 
   // std::string uri = "ws://localhost:4001/devicecontrol/v1";
-  std::string uri = argv[1];
+
+  /*std::string uri = argv[1];
   std::cout << "Connecting " << uri << std::endl;
   WebsocketEndpoint endpoint;
 
-  endpoint.Run(uri);
+  endpoint.Run(uri);*/
+
+  // We use only one shared context
+  zmq::context_t context(1);
+
+  //
+  // Test signalling between threads including timeout for thread
+  //
+  /* std::thread t(&RunWithTimeout, std::ref(context));
+
+  std::this_thread::sleep_for(17s);
+
+  try {
+    spdlog::debug("Connecting queue.");
+    auto socket =
+        zmqutils::Connect(context, "inproc://runwithtimeout", ZMQ_PAIR);
+
+    spdlog::debug("Sending message.");
+    zmqutils::SendString(socket, "QUIT");
+  } catch (zmq::error_t& e) {
+    spdlog::error("Failed to send message: {}", e.what());
+  } catch (const std::exception& e) {
+    spdlog::error("Failed to send message: {}", e.what());
+  }
+
+  t.join();*/
+
+  //
+  // Test request reply for events
+  //
+
+  // Install signal handler
+  std::signal(SIGINT, signal_handler);
+
+  // Start thread
+  std::thread t1(&ListenEvents, std::ref(context));
+  std::thread t2(&SendEvents, std::ref(context));
+
+  // auto quit_socket = zmqutils::Connect(context, "inproc://quit", ZMQ_PAIR);
+  // zmqutils::SendString(quit_socket, "QUIT");
+
+  t1.join();
+  t2.join();
 
   return 0;
 }

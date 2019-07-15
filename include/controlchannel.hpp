@@ -1,9 +1,9 @@
 #ifndef CONTROLCHANNEL_HPP_
 #define CONTROLCHANNEL_HPP_
 
-#include "zmq.hpp"
-
 #include <cstdint>
+
+#include "zmq.hpp"
 
 namespace barbarossa::controlchannel::v1 {
 
