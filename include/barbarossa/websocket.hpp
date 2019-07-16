@@ -9,6 +9,7 @@
 
 #define ASIO_STANDALONE
 
+#include "barbarossa/protocol.hpp"
 #include "nlohmann/json.hpp"
 #include "websocketpp/client.hpp"
 #include "websocketpp/common/memory.hpp"
@@ -16,8 +17,6 @@
 #include "websocketpp/config/asio_no_tls_client.hpp"
 #include "zmq.hpp"
 #include "zmq_addon.hpp"
-
-#include "protocol.hpp"
 
 using namespace barbarossa::controlchannel::v1;
 using json = nlohmann::json;

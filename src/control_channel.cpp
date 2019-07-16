@@ -1,15 +1,14 @@
-#include "controlchannel.hpp"
+#include "barbarossa/control_channel.hpp"
 
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <thread>
 
+#include "barbarossa/protocol.hpp"
 #include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 #include "zmq_addon.hpp"
-
-#include "protocol.hpp"
 
 using json = nlohmann::json;
 

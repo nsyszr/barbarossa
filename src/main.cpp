@@ -1,21 +1,13 @@
-#include <atomic>
+#include <csignal>
 #include <iostream>
 #include <string>
 
+#include "barbarossa/globals.hpp"
+#include "barbarossa/websocket.hpp"
+#include "barbarossa/zmq_utils.hpp"
 #include "spdlog/spdlog.h"
 
-#include "websocket.hpp"
-#include "zmqutils.hpp"
-
 namespace zmqutils = barbarossa::zmqutils;
-
-// std::atomic<bool> quit_signal(false);
-
-namespace {
-volatile std::sig_atomic_t quit_signal;
-}
-
-void signal_handler(int signal) { quit_signal = signal; }
 
 /* namespace details {
 class Details {
@@ -85,7 +77,7 @@ void RunWithTimeout(zmq::context_t& context) {
 }
 
 void ListenEvents(zmq::context_t& context) {
-  spdlog::debug("Start ListenEvents.");
+  spdlog::debug("Start ListenEvents thread.");
 
   auto event_socket = zmqutils::Bind(context, "inproc://events", ZMQ_PAIR);
   // auto quit_socket = zmqutils::Bind(context, "inproc://quit", ZMQ_PAIR);
@@ -109,12 +101,13 @@ void ListenEvents(zmq::context_t& context) {
 
     try {
       auto msg = zmqutils::RecvString(event_socket);
-      spdlog::info("event: {}", msg);
+      spdlog::debug("Received an event: {}", msg);
     } catch (zmq::error_t& e) {
-      spdlog::info("interrupt received");
+      spdlog::warn("Failed to receive a message: {}", e.what());
     }
-    if (quit_signal == SIGINT) {
-      spdlog::info("SIGINT. Exit ListenEvents thread.");
+    if (barbarossa::gQuitSignal == SIGINT ||
+        barbarossa::gQuitSignal == SIGTERM) {
+      spdlog::info("Quit signal is set. Exit ListenEvents thread.");
       return;
     }
   }
@@ -123,7 +116,7 @@ void ListenEvents(zmq::context_t& context) {
 void SendEvents(zmq::context_t& context) {
   using namespace std::chrono_literals;
 
-  spdlog::debug("Start SendEvents.");
+  spdlog::debug("Start SendEvents thread.");
 
   auto event_socket = zmqutils::Connect(context, "inproc://events", ZMQ_PAIR);
 
@@ -135,18 +128,19 @@ void SendEvents(zmq::context_t& context) {
     try {
       zmqutils::SendString(event_socket, ss.str());
     } catch (zmq::error_t& e) {
-      spdlog::info("interrupt received");
+      spdlog::warn("Failed to send message: {}", e.what());
     }
-    if (quit_signal == SIGINT) {
-      spdlog::info("SIGINT. Exit SendEvents thread.");
+    if (barbarossa::gQuitSignal == SIGINT ||
+        barbarossa::gQuitSignal == SIGTERM) {
+      spdlog::info("Quit signal is set. Exit SendEvents thread.");
       return;
     }
   }
 
-  spdlog::debug("End of SendEvents.");
+  spdlog::debug("Exit SendEvents thread.");
 }
 
-int main(int argc, char* argv[]) {
+int main(/*int argc, char* argv[]*/) {
   spdlog::set_level(spdlog::level::debug);
 
   // using json = nlohmann::json;
@@ -185,9 +179,6 @@ int main(int argc, char* argv[]) {
 
   endpoint.Run(uri);*/
 
-  // We use only one shared context
-  zmq::context_t context(1);
-
   //
   // Test signalling between threads including timeout for thread
   //
@@ -213,19 +204,23 @@ int main(int argc, char* argv[]) {
   //
   // Test request reply for events
   //
-
   // Install signal handler
-  std::signal(SIGINT, signal_handler);
+  // std::signal(SIGINT, barbarossa::SignalHandler);
+  // std::signal(SIGTERM, barbarossa::SignalHandler);
+  if (!barbarossa::InstallSignalHandler()) {
+    spdlog::critical("Could not install signal handlers.");
+    exit(1);
+  }
 
   // Start thread
-  std::thread t1(&ListenEvents, std::ref(context));
-  std::thread t2(&SendEvents, std::ref(context));
+  std::thread t1(&ListenEvents, std::ref(barbarossa::gInProcContext));
+  std::thread t2(&SendEvents, std::ref(barbarossa::gInProcContext));
 
   // auto quit_socket = zmqutils::Connect(context, "inproc://quit", ZMQ_PAIR);
   // zmqutils::SendString(quit_socket, "QUIT");
 
-  t1.join();
   t2.join();
+  t1.join();
 
   return 0;
 }
