@@ -1,3 +1,4 @@
+#include <condition_variable>
 #include <csignal>
 #include <iostream>
 #include <string>
@@ -8,6 +9,11 @@
 #include "spdlog/spdlog.h"
 
 namespace zmqutils = barbarossa::zmqutils;
+
+namespace {
+std::function<void(int)> ShutdownHandler;
+void SignalHandler(int signal) { ShutdownHandler(signal); }
+}  // namespace
 
 /* namespace details {
 class Details {
@@ -140,6 +146,41 @@ void SendEvents(zmq::context_t& context) {
   spdlog::debug("Exit SendEvents thread.");
 }
 
+void SendPong(zmq::context_t& context) {
+  using namespace std::chrono_literals;
+
+  spdlog::debug("Start SendPong thread.");
+
+  auto event_socket =
+      zmqutils::Connect(context, "inproc://heartbeat", ZMQ_PAIR);
+
+  std::this_thread::sleep_for(3s);
+
+  try {
+    zmqutils::SendString(event_socket, "PONG");
+  } catch (zmq::error_t& e) {
+    spdlog::warn("Failed to send message: {}", e.what());
+  }
+}
+
+bool RequestPingPong(zmq::context_t& context) {
+  spdlog::debug("RequestPingPong called");
+
+  auto event_socket = zmqutils::Bind(context, "inproc://heartbeat", ZMQ_PAIR);
+  try {
+    auto msg = zmqutils::RecvString(event_socket);
+    spdlog::debug("Received an event: {}", msg);
+    return true;
+  } catch (zmq::error_t& e) {
+    spdlog::warn("Failed to receive a message: {}", e.what());
+  }
+  if (barbarossa::gQuitSignal == SIGINT || barbarossa::gQuitSignal == SIGTERM) {
+    spdlog::info("Quit signal is set. Exit ListenEvents thread.");
+  }
+  return false;
+}
+
+
 int main(/*int argc, char* argv[]*/) {
   spdlog::set_level(spdlog::level::debug);
 
@@ -207,20 +248,168 @@ int main(/*int argc, char* argv[]*/) {
   // Install signal handler
   // std::signal(SIGINT, barbarossa::SignalHandler);
   // std::signal(SIGTERM, barbarossa::SignalHandler);
-  if (!barbarossa::InstallSignalHandler()) {
-    spdlog::critical("Could not install signal handlers.");
-    exit(1);
-  }
+  // if (!barbarossa::InstallSignalHandler()) {
+  //  spdlog::critical("Could not install signal handlers.");
+  //  exit(1);
+  // }
+
+  // std::thread t(&SendPong, std::ref(barbarossa::gInProcContext));
+
+  /*std::future<bool> request =
+      std::async(RequestPingPong, std::ref(barbarossa::gInProcContext));
+
+  std::chrono::system_clock::time_point timeout_at =
+      std::chrono::system_clock::now() + std::chrono::milliseconds(2000);
+
+  if (request.wait_until(timeout_at) == std::future_status::ready) {
+    std::cout << "Pong received with value: " << request.get() << std::endl;
+  } else {
+    std::cout << "Pong timeoute" << std::endl;
+  }*/
+
+  /*std::promise<bool> request;
+  std::future<bool> request_result = request.get_future();
+  std::thread(
+      [](std::promise<bool> request) {
+        auto socket = zmqutils::Bind(barbarossa::gInProcContext,
+                                     "inproc://heartbeat", ZMQ_PAIR);
+
+        zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
+
+        std::chrono::seconds timeout_s(4);
+        zmq::poll(&items[0], 1, timeout_s);
+
+        bool reply = false;
+        if (items[0].revents & ZMQ_POLLIN) {
+          auto msg = zmqutils::RecvString(socket);
+          spdlog::info("Got message: {}", msg);
+          reply = true;
+        }
+
+        request.set_value_at_thread_exit(reply);
+      },
+      std::move(request))
+      .detach();
+
+  std::cout << "Request reply: " << request_result.get() << std::endl;*/
+
+
+  std::condition_variable stop_heartbeat;
+  std::mutex stop_heartbeat_mutex;
+
+  std::condition_variable stop_reply;
+  std::mutex stop_reply_mutex;
+
+  std::signal(SIGINT, SignalHandler);
+  ShutdownHandler = [&](int signal) {
+    spdlog::info("Shutting down server");
+    std::unique_lock<std::mutex> lock(stop_heartbeat_mutex);
+    stop_heartbeat.notify_one();
+
+    std::unique_lock<std::mutex> lock2(stop_reply_mutex);
+    stop_reply.notify_one();
+  };
+
+  std::thread heartbeat(
+      [&](std::chrono::seconds ping_intervall,
+          std::chrono::seconds pong_timeout) {
+        while (true) {
+          std::unique_lock<std::mutex> lock(stop_heartbeat_mutex);
+
+          spdlog::debug("Wait until sending ping or die.");
+          // We send every given seconds a ping or we stop the hearbeat
+          if (stop_heartbeat.wait_for(lock, ping_intervall) ==
+              std::cv_status::no_timeout) {
+            spdlog::info("Terminate heartbeat. Received the stop condition.");
+            break;  // Exit the loop because stop_heartbeat condition is set
+          }
+
+          // Send ping
+          spdlog::debug("Sending ping.");
+          auto ping_socket = zmqutils::Connect(barbarossa::gInProcContext,
+                                               "inproc://ping", ZMQ_PAIR);
+          zmqutils::SendString(ping_socket, "PING");
+
+          // Create a async wait ping reply routine which returns a future
+          auto request = std::async(
+              [](std::chrono::seconds timeout) {
+                auto socket = zmqutils::Bind(barbarossa::gInProcContext,
+                                             "inproc://pong", ZMQ_PAIR);
+
+                zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
+
+                zmq::poll(&items[0], 1, timeout);
+
+                if (items[0].revents & ZMQ_POLLIN) {
+                  auto msg = zmqutils::RecvString(socket);
+                  spdlog::info("Got message: {}", msg);
+                  return true;
+                }
+
+                return false;
+              },
+              pong_timeout);
+
+          // Wait until we get a reply
+          spdlog::debug("Waiting for pong.");
+          bool reply = request.get();
+          spdlog::debug("Pong result: {}");
+
+          if (reply == false) {
+            spdlog::warn("Terminate heartbeat. We didn't received a pong.");
+            break;  // Exit the loop because ping wasn't replied within time.
+          }
+        }
+      },
+      std::chrono::seconds(16), std::chrono::seconds(4));
+
+
+  std::thread reply([&]() {
+    std::chrono::seconds timeout(1);
+    auto socket =
+        zmqutils::Bind(barbarossa::gInProcContext, "inproc://ping", ZMQ_PAIR);
+    zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
+
+    while (true) {
+      std::unique_lock<std::mutex> lock(stop_reply_mutex);
+
+      spdlog::debug("Wait with reply for test");
+      // We send every given seconds a ping or we stop the hearbeat
+      if (stop_reply.wait_for(lock, timeout) == std::cv_status::no_timeout) {
+        spdlog::info("Terminate reply. Received the stop condition.");
+        break;  // Exit the loop because stop_reply condition is set
+      }
+
+      zmq::poll(&items[0], 1, 1);  // 1 second timeout
+
+      if (items[0].revents & ZMQ_POLLIN) {
+        auto msg = zmqutils::RecvString(socket);
+        spdlog::info("Got ping message: {}", msg);
+
+        spdlog::info("Send pong messge");
+        auto pong_socket = zmqutils::Connect(barbarossa::gInProcContext,
+                                             "inproc://pong", ZMQ_PAIR);
+        zmqutils::SendString(pong_socket, "PONG");
+        timeout++;
+      }
+    }
+  });
+
+
+  heartbeat.join();
+  reply.join();
+
+  // t.join();
 
   // Start thread
-  std::thread t1(&ListenEvents, std::ref(barbarossa::gInProcContext));
-  std::thread t2(&SendEvents, std::ref(barbarossa::gInProcContext));
+  // std::thread t1(&ListenEvents, std::ref(barbarossa::gInProcContext));
+  // std::thread t2(&SendEvents, std::ref(barbarossa::gInProcContext));
 
   // auto quit_socket = zmqutils::Connect(context, "inproc://quit", ZMQ_PAIR);
   // zmqutils::SendString(quit_socket, "QUIT");
 
-  t2.join();
-  t1.join();
+  // t2.join();
+  // t1.join();
 
   return 0;
 }

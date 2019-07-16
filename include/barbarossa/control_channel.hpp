@@ -2,7 +2,10 @@
 #define CONTROLCHANNEL_HPP_
 
 #include <cstdint>
+#include <mutex>
 
+#include "barbarossa/protocol.hpp"
+#include "nlohmann/json.hpp"
 #include "zmq.hpp"
 
 namespace barbarossa::controlchannel::v1 {
@@ -41,6 +44,10 @@ enum ControlChannelEvents {
   kControlChannelEventOnTimeout = 5,
 };
 
+class InvalidOperationError : public std::exception {
+  const char* what() const throw() { return "Invalid operation"; }
+};
+
 class Connection {
  public:
   void Connect();
@@ -50,6 +57,8 @@ class Connection {
 class ControlChannel {
   ControlChannelStates state_;
   Connection con_;
+  std::mutex raise_event_mutex_;
+
   // Req/Rep socket for communication with connection and application (sigint)
   zmq::context_t context_;
   zmq::socket_t socket_;
@@ -61,7 +70,13 @@ class ControlChannel {
   void HandleMessage(const std::string_view& msg);
 
   int EstablishSession();
-  void WaitForWelcomeMessageOrDie();
+  void WaitForHelloReplyOrDie();
+
+  void RaiseEvent(ControlChannelEvents event);
+  void RaiseEvent(ControlChannelEvents event, const json& j);
+
+  void RaiseOnTimeoutEvent(protocol::MessageTypes msg_type);
+
   void WaitForPongMessageOrDie();
 
  public:

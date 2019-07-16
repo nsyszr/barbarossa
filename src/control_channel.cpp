@@ -5,12 +5,15 @@
 #include <sstream>
 #include <thread>
 
+#include "barbarossa/globals.hpp"
 #include "barbarossa/protocol.hpp"
+#include "barbarossa/zmq_utils.hpp"
 #include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 #include "zmq_addon.hpp"
 
 using json = nlohmann::json;
+namespace zmqutils = barbarossa::zmqutils;
 
 namespace barbarossa::controlchannel::v1 {
 
@@ -75,59 +78,104 @@ int ControlChannel::EstablishSession() {
     return rc;
   }
 
-  std::thread(&ControlChannel::WaitForWelcomeMessageOrDie, this).detach();
+  std::thread(&ControlChannel::WaitForHelloReplyOrDie, this).detach();
 
   return 0;
 }
 
-void ControlChannel::WaitForWelcomeMessageOrDie() {
+void ControlChannel::WaitForHelloReplyOrDie() {
   spdlog::debug("Wait for welcome message or die thread started.");
 
   // TODO(DGL) Fix hardcoded timeout
   long timeout_ms = 16000;
 
-  zmq::context_t context(1);
+  /*zmq::context_t context(1);
   zmq::socket_t wait_socket(context, ZMQ_REP);
-  wait_socket.bind("inproc://waitforwelcomemessageordie");
+  wait_socket.bind("inproc://waitforwelcomemessageordie");*/
+  auto socket = zmqutils::Bind(barbarossa::gInProcContext,
+                               "inproc:://helloreply", ZMQ_PAIR);
 
   // while (1) {
   //  Poll socket for a reply, with timeout
-  zmq::pollitem_t items[] = {{wait_socket, 0, ZMQ_POLLIN, 0}};
+  zmq::pollitem_t items[] = {{socket, 0, ZMQ_POLLIN, 0}};
   zmq::poll(&items[0], 1, timeout_ms);
 
   //  If we got a reply, we can leave the thread without any response
   if (items[0].revents & ZMQ_POLLIN) {
     // Receive the message even if we don't handle it. This ensures that the
     // queue is empty.
-    zmq::message_t msg;
-    wait_socket.recv(&msg, 0);  // zmq::recv_flags::none
+    /*zmq::message_t msg;
+    wait_socket.recv(&msg, 0);  // zmq::recv_flags::none*/
+    auto msg = zmqutils::RecvString(socket);
 
-    spdlog::debug(
-        "Got a valid signal. Exit wait for welcome message or die thread.");
-    return;  // Exit
+    spdlog::debug("Received a welcome message signal: {}", msg);
+    return;  // Exit successfully
   }
 
   // We didn't received a hello message within timeout period. Notify the
   // control channel event loop.
-  zmq::socket_t controlchannel_socket(context, ZMQ_REQ);
-  controlchannel_socket.connect("inproc://controlchannel");
-
-  zmq::multipart_t request;
-  request.addtyp<ControlChannelEvents>(kControlChannelEventOnTimeout);
-  request.addtyp<protocol::MessageTypes>(protocol::kMessageTypeHello);
-
-  request.send(controlchannel_socket);
+  RaiseOnTimeoutEvent(protocol::kMessageTypeHello);
 
   spdlog::warn("Wait for welcome message or die thread expired.");
   // return;  // Exit the loop
   //}
 }
 
+void ControlChannel::RaiseEvent(ControlChannelEvents event) {
+  switch (event) {
+    case kControlChannelEventOnOpen:
+    case kControlChannelEventOnClose:
+    case kControlChannelEventOnFailed:
+    case kControlChannelEventOnInterrupt: {
+      std::lock_guard<std::mutex> lock(raise_event_mutex_);
+      auto socket = zmqutils::Connect(barbarossa::gInProcContext,
+                                      "inproc://events", ZMQ_PAIR);
+
+      zmq::message_t msg(event);
+      socket.send(msg, zmq::send_flags::none);
+
+      break;  // lock will be released when out of this scope
+    }
+    case kControlChannelEventOnMessage:
+    case kControlChannelEventOnTimeout: {
+      throw InvalidOperationError();
+    }
+  }
+}
+
+void ControlChannel::RaiseEvent(ControlChannelEvents event, const json &j) {
+  switch (event) {
+    case kControlChannelEventOnOpen:
+    case kControlChannelEventOnClose:
+    case kControlChannelEventOnFailed:
+    case kControlChannelEventOnInterrupt: {
+      throw InvalidOperationError();
+    }
+    case kControlChannelEventOnMessage:
+    case kControlChannelEventOnTimeout: {
+      std::lock_guard<std::mutex> lock(raise_event_mutex_);
+      auto socket = zmqutils::Connect(barbarossa::gInProcContext,
+                                      "inproc://events", ZMQ_PAIR);
+
+      zmq::multipart_t request;
+      request.addtyp<ControlChannelEvents>(event);
+      request.addstr(j.dump());
+
+      request.send(socket);
+
+      break;  // lock will be released when out of this scope
+    }
+  }
+}
+
+void ControlChannel::RaiseOnTimeoutEvent(protocol::MessageTypes msg_type) {
+  RaiseEvent(kControlChannelEventOnTimeout, msg_type);
+}
+
 void ControlChannel::WaitForPongMessageOrDie() {
   spdlog::debug("Wait for ping message or die thread started.");
 
   // TODO(DGL) Fixe hardcoded timeout
-  long session_timeout_ms = 20000;
   long ping_interval_ms = 16000;
   long pong_timeout_ms = 4000;
 
