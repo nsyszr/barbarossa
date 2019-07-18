@@ -25,6 +25,7 @@ WebsocketEndpoint::WebsocketEndpoint(ControlChannel& control_channel)
 }
 
 bool WebsocketEndpoint::Connect(const std::string& uri) {
+  // TODO(DGL) Catch the exception of init_asio and return error code instead!
   endpoint_.init_asio();
 
   // Bind the handlers we are using
@@ -44,12 +45,11 @@ bool WebsocketEndpoint::Connect(const std::string& uri) {
 
   // Initiate connection
   websocketpp::lib::error_code ec;
-  client::connection_ptr con = endpoint_.get_connection(uri_, ec);
+  client::connection_ptr con = endpoint_.get_connection(uri, ec);
   if (ec) {
+    // TODO(DGL) Implement return error code!
     spdlog::error("websocket_endpoint: error connecting: {}", ec.message());
-    // TODO(DGL) Should we throw an exception for better error handling?
-    // TODO(DGL) Check if control channel get notified by OnFail handler
-    return;
+    return false;
   }
 
   // Grab the handle for this connection
@@ -57,6 +57,8 @@ bool WebsocketEndpoint::Connect(const std::string& uri) {
 
   // Queue the connection
   endpoint_.connect(con);
+
+  return true;
 }
 
 WebsocketEndpoint::~WebsocketEndpoint() {
@@ -130,7 +132,7 @@ void WebsocketEndpoint::OnFail(websocketpp::connection_hdl) {
   control_channel_.RaiseEvent(kControlChannelEventOnFail);
 }
 
-void WebsocketEndpoint::OnMessage(websocketpp::connection_hdl hdl,
+void WebsocketEndpoint::OnMessage(websocketpp::connection_hdl,
                                   message_ptr msg) {
   spdlog::debug("websocket_endpoint: Event on open");
   control_channel_.RaiseEvent(kControlChannelEventOnMessage,

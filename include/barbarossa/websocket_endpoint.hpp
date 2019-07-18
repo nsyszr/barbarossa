@@ -28,11 +28,10 @@ class WebsocketEndpoint {
   bool initialized() { return initialized_; }
 
  private:
-  client endpoint_;
-  ControlChannel& control_channel_;
-  std::string uri_;
   bool initialized_;
   bool connected_;
+  ControlChannel& control_channel_;
+  client endpoint_;
   websocketpp::lib::mutex lock_;
   websocketpp::connection_hdl hdl_;
   websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
