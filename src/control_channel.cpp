@@ -125,7 +125,7 @@ void ControlChannel::RaiseEvent(ControlChannelEvents event) {
   switch (event) {
     case kControlChannelEventOnOpen:
     case kControlChannelEventOnClose:
-    case kControlChannelEventOnFailed:
+    case kControlChannelEventOnFail:
     case kControlChannelEventOnInterrupt: {
       std::lock_guard<std::mutex> lock(raise_event_mutex_);
       auto socket = zmqutils::Connect(barbarossa::gInProcContext,
@@ -143,11 +143,12 @@ void ControlChannel::RaiseEvent(ControlChannelEvents event) {
   }
 }
 
-void ControlChannel::RaiseEvent(ControlChannelEvents event, const json &j) {
+void ControlChannel::RaiseEvent(ControlChannelEvents event,
+                                const std::string &payload) {
   switch (event) {
     case kControlChannelEventOnOpen:
     case kControlChannelEventOnClose:
-    case kControlChannelEventOnFailed:
+    case kControlChannelEventOnFail:
     case kControlChannelEventOnInterrupt: {
       throw InvalidOperationError();
     }
@@ -159,7 +160,7 @@ void ControlChannel::RaiseEvent(ControlChannelEvents event, const json &j) {
 
       zmq::multipart_t request;
       request.addtyp<ControlChannelEvents>(event);
-      request.addstr(j.dump());
+      request.addstr(payload);
 
       request.send(socket);
 
@@ -169,7 +170,8 @@ void ControlChannel::RaiseEvent(ControlChannelEvents event, const json &j) {
 }
 
 void ControlChannel::RaiseOnTimeoutEvent(protocol::MessageTypes msg_type) {
-  RaiseEvent(kControlChannelEventOnTimeout, msg_type);
+  // TODO(DGL) Impelement this method
+  // RaiseEvent(kControlChannelEventOnTimeout, msg_type);
 }
 
 void ControlChannel::WaitForPongMessageOrDie() {
@@ -291,7 +293,7 @@ void ControlChannel::Run() {
         TransitionStateTo(kControlChannelStateClosed);
         break;
       }
-      case kControlChannelEventOnFailed: {
+      case kControlChannelEventOnFail: {
         TransitionStateTo(kControlChannelStateClosed);
         break;
       }

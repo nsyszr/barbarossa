@@ -1,10 +1,11 @@
 #include <condition_variable>
 #include <csignal>
+#include <future>
 #include <iostream>
 #include <string>
 
 #include "barbarossa/globals.hpp"
-#include "barbarossa/websocket.hpp"
+// #include "barbarossa/websocket.hpp"
 #include "barbarossa/zmq_utils.hpp"
 #include "spdlog/spdlog.h"
 
