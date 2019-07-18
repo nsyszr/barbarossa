@@ -4,8 +4,9 @@
 #include <iostream>
 #include <string>
 
+#include "barbarossa/control_channel.hpp"
 #include "barbarossa/globals.hpp"
-// #include "barbarossa/websocket.hpp"
+#include "barbarossa/websocket_endpoint.hpp"
 #include "barbarossa/zmq_utils.hpp"
 #include "spdlog/spdlog.h"
 
@@ -294,8 +295,11 @@ int main(/*int argc, char* argv[]*/) {
 
   std::cout << "Request reply: " << request_result.get() << std::endl;*/
 
+  //
+  // IMPORTANT CODE HERE FOR CONTROL CHANNEL
+  //
 
-  std::condition_variable stop_heartbeat;
+  /*std::condition_variable stop_heartbeat;
   std::mutex stop_heartbeat_mutex;
 
   std::condition_variable stop_reply;
@@ -398,7 +402,11 @@ int main(/*int argc, char* argv[]*/) {
 
 
   heartbeat.join();
-  reply.join();
+  reply.join();*/
+
+  //
+  // END OF IMPORTANT CODE FOR CONTROL CHANNEL
+  //
 
   // t.join();
 
@@ -411,6 +419,12 @@ int main(/*int argc, char* argv[]*/) {
 
   // t2.join();
   // t1.join();
+
+
+  using namespace barbarossa::controlchannel::v1;
+  WebsocketEndpoint endpoint("ws://192.168.122.1:4001/devicecontrol/v1");
+  ControlChannel<WebsocketEndpoint> control_channel(endpoint);
+  control_channel.Run();
 
   return 0;
 }

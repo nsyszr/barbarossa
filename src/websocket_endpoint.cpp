@@ -14,17 +14,15 @@
 
 namespace barbarossa::controlchannel::v1 {
 
-WebsocketEndpoint::WebsocketEndpoint(ControlChannel& control_channel)
-    : initialized_(false),
-      connected_(false),
-      control_channel_(control_channel) {
+WebsocketEndpoint::WebsocketEndpoint(const std::string& uri)
+    : uri_(uri), initialized_(false), connected_(false) {
   endpoint_.clear_access_channels(websocketpp::log::alevel::all);
   endpoint_.set_access_channels(websocketpp::log::alevel::connect);
   endpoint_.set_access_channels(websocketpp::log::alevel::disconnect);
   endpoint_.set_access_channels(websocketpp::log::alevel::app);
 }
 
-bool WebsocketEndpoint::Connect(const std::string& uri) {
+bool WebsocketEndpoint::Connect() {
   // TODO(DGL) Catch the exception of init_asio and return error code instead!
   endpoint_.init_asio();
 
@@ -45,7 +43,7 @@ bool WebsocketEndpoint::Connect(const std::string& uri) {
 
   // Initiate connection
   websocketpp::lib::error_code ec;
-  client::connection_ptr con = endpoint_.get_connection(uri, ec);
+  client::connection_ptr con = endpoint_.get_connection(uri_, ec);
   if (ec) {
     // TODO(DGL) Implement return error code!
     spdlog::error("websocket_endpoint: error connecting: {}", ec.message());
@@ -72,14 +70,14 @@ WebsocketEndpoint::~WebsocketEndpoint() {
   thread_->join();
 }
 
-bool WebsocketEndpoint::Send(const std::string& data) {
+bool WebsocketEndpoint::Send(const std::string& payload) {
   if (!initialized_ || !connected_) {
     // TODO(DGL) Implement return error code!
     return false;
   }
 
   websocketpp::lib::error_code ec;
-  endpoint_.send(hdl_, data, websocketpp::frame::opcode::text, ec);
+  endpoint_.send(hdl_, payload, websocketpp::frame::opcode::text, ec);
   if (ec) {
     // TODO(DGL) Implement return error code!
     spdlog::debug("websocket_endpoint: error sending message: {}",
@@ -115,28 +113,35 @@ void WebsocketEndpoint::OnOpen(websocketpp::connection_hdl) {
   spdlog::debug("websocket_endpoint: Event on open");
   scoped_lock guard(lock_);
   connected_ = true;
-  control_channel_.RaiseEvent(kControlChannelEventOnOpen);
+  if (on_open_handler_) {
+    on_open_handler_();
+  }
 }
 
 void WebsocketEndpoint::OnClose(websocketpp::connection_hdl) {
   spdlog::debug("websocket_endpoint: Event on open");
   scoped_lock guard(lock_);
   connected_ = false;
-  control_channel_.RaiseEvent(kControlChannelEventOnClose);
+  if (on_close_handler_) {
+    on_close_handler_();
+  }
 }
 
 void WebsocketEndpoint::OnFail(websocketpp::connection_hdl) {
   spdlog::debug("websocket_endpoint: Event on open");
   scoped_lock guard(lock_);
   connected_ = false;
-  control_channel_.RaiseEvent(kControlChannelEventOnFail);
+  if (on_fail_handler_) {
+    on_fail_handler_();
+  }
 }
 
 void WebsocketEndpoint::OnMessage(websocketpp::connection_hdl,
-                                  message_ptr msg) {
+                                  message_ptr msgp) {
   spdlog::debug("websocket_endpoint: Event on open");
-  control_channel_.RaiseEvent(kControlChannelEventOnMessage,
-                              msg->get_payload());
+  if (on_message_handler_) {
+    on_message_handler_(msgp->get_payload());
+  }
 }
 
 }  // namespace barbarossa::controlchannel::v1
