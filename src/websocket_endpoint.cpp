@@ -72,7 +72,7 @@ WebsocketEndpoint::~WebsocketEndpoint() {
   thread_->join();
 }
 
-bool WebsocketEndpoint::SendMessage(const std::string& data) {
+bool WebsocketEndpoint::Send(const std::string& data) {
   if (!initialized_ || !connected_) {
     // TODO(DGL) Implement return error code!
     return false;

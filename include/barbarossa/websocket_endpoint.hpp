@@ -21,16 +21,19 @@ class WebsocketEndpoint {
   ~WebsocketEndpoint();
 
   bool Connect(const std::string& uri);
-  bool SendMessage(const std::string& data);
+  bool Send(const std::string& data);
   bool Close();
 
   // accessors
   bool initialized() { return initialized_; }
+  bool connected() { return connected_; }
 
  private:
+  // Keep the ctor order
   bool initialized_;
   bool connected_;
   ControlChannel& control_channel_;
+
   client endpoint_;
   websocketpp::lib::mutex lock_;
   websocketpp::connection_hdl hdl_;
