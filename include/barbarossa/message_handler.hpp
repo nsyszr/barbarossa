@@ -9,7 +9,7 @@ namespace barbarossa::controlchannel::v1 {
 
 // using MessageRequest = std::tuple<protocol::MessageTypes, int32_t>;
 
-class MessageHandler {
+/*class MessageHandler {
  public:
   MessageHandler(std::function<void()> handler)
       : handler_(handler), next_(nullptr) {}
@@ -22,7 +22,13 @@ class MessageHandler {
   MessageHandler *next_;
   protocol::MessageTypes message_type_;
   int32_t request_id_;
-};
+};*/
+
+class WelcomeMessageHandler {
+ public:
+  void operator()() {}
+}
+
 
 }  // namespace barbarossa::controlchannel::v1
 
