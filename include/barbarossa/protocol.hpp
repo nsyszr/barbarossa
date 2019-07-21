@@ -13,6 +13,10 @@ using json = nlohmann::json;
 
 namespace barbarossa::controlchannel::v1::protocol {
 
+using SessionId = int32_t;
+using RequestId = int32_t;
+using PublicationId = int32_t;
+
 enum MessageTypes {
   kMessageTypeHello = 1,
   kMessageTypeWelcome = 2,
@@ -133,7 +137,7 @@ namespace welcomemessage {
 
 // The representation of the websocket welcome message (message type 2).
 class WelcomeMessage {
-  int32_t session_id_;
+  SessionId session_id_;
   json details_;
 
   auto tie() const { return std::tie(session_id_, details_); }
@@ -143,12 +147,12 @@ class WelcomeMessage {
 
  public:
   WelcomeMessage() : details_(json::object()) {}
-  explicit WelcomeMessage(int32_t session_id)
+  explicit WelcomeMessage(SessionId session_id)
       : session_id_(session_id), details_(json::object()) {}
-  WelcomeMessage(int32_t session_id, const json& details)
+  WelcomeMessage(SessionId session_id, const json& details)
       : session_id_(session_id), details_(details) {}
   template <typename T>
-  WelcomeMessage(int32_t session_id, const T& details)
+  WelcomeMessage(SessionId session_id, const T& details)
       : session_id_(session_id), details_(details) {}
 
   inline bool operator==(const WelcomeMessage& rhs) const {
@@ -156,7 +160,7 @@ class WelcomeMessage {
   }
 
   // accessors
-  auto session_id() -> int32_t { return session_id_; }
+  auto session_id() -> SessionId { return session_id_; }
   auto details() -> const json& { return details_; }
   template <typename T>
   auto details() const {
@@ -164,7 +168,7 @@ class WelcomeMessage {
   }
 
   // mutators
-  void set_session_id(int32_t session_id) { session_id_ = session_id; }
+  void set_session_id(SessionId session_id) { session_id_ = session_id; }
   void set_details(const json& details) { details_ = details; }
   template <typename T>
   void set_details(const T& details) {
@@ -191,13 +195,13 @@ inline void from_json(const json& j, WelcomeMessage& msg) {
 }  // namespace welcomemessage
 
 // Returns an instance of welcomemessage::WelcomeMessage
-inline welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id) {
+inline welcomemessage::WelcomeMessage WelcomeMessage(SessionId session_id) {
   return welcomemessage::WelcomeMessage(session_id);
 }
 
 // Returns an instance of welcomemessage::WelcomeMessage
 template <typename T>
-inline welcomemessage::WelcomeMessage WelcomeMessage(int32_t session_id,
+inline welcomemessage::WelcomeMessage WelcomeMessage(SessionId session_id,
                                                      const T& details) {
   return welcomemessage::WelcomeMessage(session_id, details);
 }
@@ -418,7 +422,7 @@ namespace errormessage {
 // The representation of the websocket error message (message type 9).
 class ErrorMessage {
   MessageTypes request_type_;
-  int32_t request_id_;
+  RequestId request_id_;
   std::string error_;
   json details_;
 
@@ -431,20 +435,20 @@ class ErrorMessage {
 
  public:
   ErrorMessage() : details_(json::object()) {}
-  ErrorMessage(MessageTypes request_type, int32_t request_id,
+  ErrorMessage(MessageTypes request_type, RequestId request_id,
                const std::string& error)
       : request_type_(request_type),
         request_id_(request_id),
         error_(error),
         details_(json::object()) {}
-  ErrorMessage(MessageTypes request_type, int32_t request_id,
+  ErrorMessage(MessageTypes request_type, RequestId request_id,
                const std::string& error, const json& details)
       : request_type_(request_type),
         request_id_(request_id),
         error_(error),
         details_(details) {}
   template <typename T>
-  ErrorMessage(MessageTypes request_type, int32_t request_id,
+  ErrorMessage(MessageTypes request_type, RequestId request_id,
                const std::string& error, const T& details)
       : request_type_(request_type),
         request_id_(request_id),
@@ -457,7 +461,7 @@ class ErrorMessage {
 
   // accessors
   auto request_type() -> MessageTypes { return request_type_; }
-  auto request_id() -> int32_t { return request_id_; }
+  auto request_id() -> RequestId { return request_id_; }
   auto error() -> const std::string& { return error_; }
   auto details() -> const json& { return details_; }
   template <typename T>
@@ -469,7 +473,7 @@ class ErrorMessage {
   void set_request_type(MessageTypes request_type) {
     request_type_ = request_type;
   }
-  void set_request_id(int32_t request_id) { request_id_ = request_id; }
+  void set_request_id(RequestId request_id) { request_id_ = request_id; }
   void set_error(const std::string& error) { error_ = error; }
   void set_details(const json& details) { details_ = details; }
   template <typename T>
@@ -502,7 +506,7 @@ inline void from_json(const json& j, ErrorMessage& msg) {
 
 // Returns an instance of errormessage::ErrorMessage
 inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
-                                               int32_t request_id,
+                                               RequestId request_id,
                                                const std::string& error) {
   return errormessage::ErrorMessage(request_type, request_id, error);
 }
@@ -510,7 +514,7 @@ inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
 // Returns an instance of errormessage::ErrorMessage
 template <typename T>
 inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
-                                               int32_t request_id,
+                                               RequestId request_id,
                                                const std::string& error,
                                                const T& details) {
   return errormessage::ErrorMessage(request_type, request_id, error, details);
