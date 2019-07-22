@@ -348,7 +348,7 @@ class ControlChannel {
 
   void InitiateSession() {
     // Send hello message to server
-    auto hello_msg = protocol::HelloMessage("barbarossa@test");
+    auto hello_msg = protocol::HelloMessage("test@test");
     json j = hello_msg;
     endpoint_.Send(j.dump());
 
