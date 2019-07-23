@@ -1,5 +1,5 @@
-#ifndef MESSAGE_HANDLER_HPP_
-#define MESSAGE_HANDLER_HPP_
+#ifndef BARBAROSSA_MESSAGE_HANDLER_HPP_
+#define BARBAROSSA_MESSAGE_HANDLER_HPP_
 
 #include <functional>
 
@@ -27,9 +27,8 @@ namespace barbarossa::controlchannel::v1 {
 class WelcomeMessageHandler {
  public:
   void operator()() {}
-}
-
+};
 
 }  // namespace barbarossa::controlchannel::v1
 
-#endif
+#endif  // BARBAROSSA_MESSAGE_HANDLER_HPP_

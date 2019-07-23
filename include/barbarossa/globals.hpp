@@ -1,5 +1,5 @@
-#ifndef GLOBALS_HPP_
-#define GLOBALS_HPP_
+#ifndef BARBAROSSA_GLOBALS_HPP_
+#define BARBAROSSA_GLOBALS_HPP_
 
 #include <csignal>
 
@@ -14,4 +14,4 @@ bool InstallSignalHandler();
 
 }  // namespace barbarossa
 
-#endif  // GLOBALS_HPP_
+#endif  // BARBAROSSA_GLOBALS_HPP_

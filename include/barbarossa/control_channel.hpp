@@ -1,11 +1,12 @@
-#ifndef CONTROLCHANNEL_HPP_
-#define CONTROLCHANNEL_HPP_
+#ifndef BARBAROSSA_CONTROLCHANNEL_HPP_
+#define BARBAROSSA_CONTROLCHANNEL_HPP_
 
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <future>
 #include <mutex>
+#include <string>
 
 #include "barbarossa/protocol.hpp"
 #include "barbarossa/protocol_details.hpp"
@@ -42,7 +43,7 @@ enum ControlChannelStates {
   kControlChannelStateInterrupted = 8,
 };
 
-std::ostream& operator<<(std::ostream& out, ControlChannelStates value) {
+std::ostream &operator<<(std::ostream &out, ControlChannelStates value) {
   switch (value) {
     case kControlChannelStatePending:
       out << "STATE_PENDING";
@@ -94,7 +95,7 @@ enum ControlChannelEvents {
   kControlChannelEventOnTimeout = 5,
 };
 
-std::ostream& operator<<(std::ostream& out, ControlChannelEvents value) {
+std::ostream &operator<<(std::ostream &out, ControlChannelEvents value) {
   switch (value) {
     case kControlChannelEventOnOpen:
       out << "EVENT_OPEN";
@@ -125,15 +126,14 @@ std::string AsString(ControlChannelEvents value) {
   return os.str();
 }
 
-
 class InvalidOperationError : public std::exception {
-  const char* what() const throw() { return "Invalid operation"; }
+  const char *what() const throw() { return "Invalid operation"; }
 };
 
 template <typename T>
 class ControlChannel {
  public:
-  ControlChannel(T& endpoint)
+  explicit ControlChannel(T &endpoint)
       : endpoint_(endpoint), state_(kControlChannelStatePending), context_(1) {
     // We bind the handler with lambda since they raise only an event
     endpoint_.set_on_open_handler(
@@ -142,7 +142,7 @@ class ControlChannel {
         [&]() { RaiseEvent(kControlChannelEventOnClose); });
     endpoint_.set_on_fail_handler(
         [&]() { RaiseEvent(kControlChannelEventOnFail); });
-    endpoint_.set_on_message_handler([&](const std::string& payload) {
+    endpoint_.set_on_message_handler([&](const std::string &payload) {
       RaiseEvent(kControlChannelEventOnMessage, payload);
     });
   }
@@ -161,9 +161,8 @@ class ControlChannel {
 
     while (true) {
       zmq::multipart_t request(socket);
-      auto event =
-          request
-              .poptyp<ControlChannelEvents>();  // TODO(DGL) Handle exception!
+      auto event = request.poptyp<ControlChannelEvents>();  // TODO(DGL) Handle
+                                                            // exception!
 
       spdlog::debug("control_channel: Received an event: {}", AsString(event));
 
@@ -236,7 +235,7 @@ class ControlChannel {
 
  private:
   // Keep the order of ctor initialization
-  T& endpoint_;
+  T &endpoint_;
   ControlChannelStates state_;
   zmq::context_t context_;
 
@@ -273,7 +272,7 @@ class ControlChannel {
     }
   }
 
-  void RaiseEvent(ControlChannelEvents event, const std::string& data) {
+  void RaiseEvent(ControlChannelEvents event, const std::string &data) {
     std::lock_guard<std::mutex> lock(raise_event_mutex_);
     auto socket = zmqutils::Connect(context_, "inproc://events", ZMQ_PAIR);
 
@@ -328,7 +327,8 @@ class ControlChannel {
         break;
       }
       case kControlChannelStateExpired: {
-        // Keep alive expired! We didn't received a pong message within period.
+        // Keep alive expired! We didn't received a pong message within
+        // period.
         break;
       }
       case kControlChannelStateClosed: {
@@ -383,9 +383,11 @@ class ControlChannel {
         if (heartbeat_terminate_.wait_for(lock, ping_interval) ==
             std::cv_status::no_timeout) {
           spdlog::info(
-              "contorl_channel: Terminate heartbeat. Received the stop "
+              "contorl_channel: Terminate heartbeat. "
+              "Received the stop "
               "condition.");
-          break;  // Exit the loop because stop_heartbeat condition is set
+          break;  // Exit the loop because stop_heartbeat condition is
+                  // set
         }
 
         // Send ping
@@ -396,7 +398,7 @@ class ControlChannel {
 
         // Create a async wait ping reply routine which returns a future
         auto request = std::async(
-            [](zmq::context_t& context, std::chrono::seconds pong_timeout) {
+            [](zmq::context_t &context, std::chrono::seconds pong_timeout) {
               // auto context = zmq::context_t(1);
               auto socket = zmqutils::Bind(context, "inproc://pong", ZMQ_PAIR);
 
@@ -407,7 +409,9 @@ class ControlChannel {
               if (items[0].revents & ZMQ_POLLIN) {
                 auto msg = zmqutils::RecvString(socket);
                 spdlog::info(
-                    "control_channel: Received the pong notification: {}", msg);
+                    "control_channel: Received the pong "
+                    "notification: {}",
+                    msg);
                 return true;
               }
 
@@ -419,21 +423,22 @@ class ControlChannel {
         spdlog::debug("control_channel: Waiting for pong notification.");
         if (request.get() == false) {
           spdlog::warn(
-              "contorl_channel: Terminate heartbeat. We didn't received the "
+              "contorl_channel: Terminate heartbeat. We "
+              "didn't received the "
               "pong notification.");
           RaiseEvent(kControlChannelEventOnTimeout, "PING");
-          break;  // Exit the loop because ping wasn't replied within time.
+          break;  // Exit the loop because ping wasn't replied within
+                  // time.
         }
       }
-    })
-        .detach();
+    }).detach();
   }
 
   // Handle incoming messages
   // The HandleMessage method is called when a message is received by the
   // endpoint. After parsing the message type we call the specific handler or
   // raise an unsupported error.
-  ControlChannelStates HandleMessage(const std::string& payload) {
+  ControlChannelStates HandleMessage(const std::string &payload) {
     auto msg = protocol::Parse(payload);
     switch (msg.GetMessageType()) {
       case protocol::kMessageTypeWelcome:
@@ -457,7 +462,7 @@ class ControlChannel {
     }
   }
 
-  ControlChannelStates HandleWelcomeMessage(protocol::BasicMessage& msg) {
+  ControlChannelStates HandleWelcomeMessage(protocol::BasicMessage &msg) {
     spdlog::debug("control_channel: Release hello message reply condition");
     std::unique_lock<std::mutex> lock(hello_message_reply_mutex_);
     hello_message_reply_.notify_one();
@@ -476,9 +481,10 @@ class ControlChannel {
     return kControlChannelStateEstablished;
   }
 
-  ControlChannelStates HandleAbortMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandleAbortMessage(protocol::BasicMessage &) {
     ControlChannelStates state;
-    // To get current state safely, we're locking the access inside the mutex
+    // To get current state safely, we're locking the access inside the
+    // mutex
     {
       std::lock_guard<std::mutex> lock(state_mutex_);
       state = state_;
@@ -494,30 +500,30 @@ class ControlChannel {
     }
   }
 
-  ControlChannelStates HandlePongMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandlePongMessage(protocol::BasicMessage &) {
     auto socket = zmqutils::Connect(context_, "inproc://pong", ZMQ_PAIR);
     zmqutils::SendString(socket, "PONG");
     return kControlChannelStateEstablished;
   }
 
-  ControlChannelStates HandleErrorMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandleErrorMessage(protocol::BasicMessage &) {
     return kControlChannelStateEstablished;
   }
 
-  ControlChannelStates HandleCallMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandleCallMessage(protocol::BasicMessage &) {
     return kControlChannelStateEstablished;
   }
 
-  ControlChannelStates HandlePublishedMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandlePublishedMessage(protocol::BasicMessage &) {
     return kControlChannelStateEstablished;
   }
 
-  ControlChannelStates HandleNotSupportedMessage(protocol::BasicMessage&) {
+  ControlChannelStates HandleNotSupportedMessage(protocol::BasicMessage &) {
     return kControlChannelStateEstablished;
   }
 
   // Handle a timeout
-  ControlChannelStates HandleTimeout(const std::string& data) {
+  ControlChannelStates HandleTimeout(const std::string &data) {
     if (data == "HELLO") {
       spdlog::debug("control_channel: handle hello timeout");
       return kControlChannelStateExpired;

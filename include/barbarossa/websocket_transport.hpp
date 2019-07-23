@@ -1,7 +1,8 @@
-#ifndef WEBSOCKET_TRANSPORT_HPP_
-#define WEBSOCKET_TRANSPORT_HPP_
+#ifndef BARBAROSSA_WEBSOCKET_TRANSPORT_HPP_
+#define BARBAROSSA_WEBSOCKET_TRANSPORT_HPP_
 
 #include <future>
+#include <string>
 
 #include "barbarossa/message.hpp"
 #include "barbarossa/transport.hpp"
@@ -17,7 +18,7 @@ class WebSocketTransport : public Transport {
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
-  WebSocketTransport(const std::string& uri);
+  explicit WebSocketTransport(const std::string& uri);
 
   void Connect() override;
   void Disconnect() override;
@@ -39,4 +40,4 @@ class WebSocketTransport : public Transport {
 }  // namespace barbarossa::controlchannel
 
 #include "barbarossa/websocket_transport.ipp"
-#endif  // WEBSOCKET_TRANSPORT_HPP_
+#endif  // BARBAROSSA_WEBSOCKET_TRANSPORT_HPP_

@@ -1,5 +1,5 @@
-#ifndef ZMQUTILS_HPP_
-#define ZMQUTILS_HPP_
+#ifndef BARBAROSSA_ZMQUTILS_HPP_
+#define BARBAROSSA_ZMQUTILS_HPP_
 
 #include "zmq.hpp"
 
@@ -34,7 +34,6 @@ inline std::string RecvString(zmq::socket_t& socket,
   return std::string(static_cast<char*>(message.data()), message.size());
 }
 
-
 }  // namespace barbarossa::zmqutils
 
-#endif  // ZMQUTILS_HPP_
+#endif  // BARBAROSSA_ZMQUTILS_HPP_

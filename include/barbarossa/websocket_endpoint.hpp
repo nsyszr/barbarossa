@@ -1,5 +1,5 @@
-#ifndef WEBSOCKET_ENDPOINT_HPP_
-#define WEBSOCKET_ENDPOINT_HPP_
+#ifndef BARBAROSSA_WEBSOCKET_ENDPOINT_HPP_
+#define BARBAROSSA_WEBSOCKET_ENDPOINT_HPP_
 
 #include <functional>
 #include <string>
@@ -74,4 +74,4 @@ class WebsocketEndpoint {
 
 }  // namespace barbarossa::controlchannel::v1
 
-#endif  // WEBSOCKET_ENDPOINT_HPP_
+#endif  // BARBAROSSA_WEBSOCKET_ENDPOINT_HPP_

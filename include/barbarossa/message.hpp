@@ -1,5 +1,5 @@
-#ifndef MESSAGE_HPP_
-#define MESSAGE_HPP_
+#ifndef BARBAROSSA_MESSAGE_HPP_
+#define BARBAROSSA_MESSAGE_HPP_
 
 #include <cstdint>
 #include <vector>
@@ -39,4 +39,4 @@ class Message {
 }  // namespace barbarossa::controlchannel
 
 #include "barbarossa/message.ipp"
-#endif  // MESSAGE_HPP_
+#endif  // BARBAROSSA_MESSAGE_HPP_

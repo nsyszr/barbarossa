@@ -1,8 +1,8 @@
 // Copyright (c) 2018 by nsyszr.io.
 // Author: dgl
 
-#ifndef PROTOCOL_HPP_
-#define PROTOCOL_HPP_
+#ifndef BARBAROSSA_PROTOCOL_HPP_
+#define BARBAROSSA_PROTOCOL_HPP_
 
 #include <string>
 #include <string_view>
@@ -36,7 +36,7 @@ class BasicMessage {
 
   // Hide the constructor
   BasicMessage() {}
-  BasicMessage(const json& j) : j_(j) {}
+  explict BasicMessage(const json& j) : j_(j) {}
 
  public:
   MessageTypes GetMessageType() {
@@ -522,4 +522,4 @@ inline errormessage::ErrorMessage ErrorMessage(MessageTypes request_type,
 
 }  // namespace barbarossa::controlchannel::v1::protocol
 
-#endif  // PROTOCOL_HPP_
+#endif  // BARBAROSSA_PROTOCOL_HPP_

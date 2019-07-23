@@ -1,5 +1,7 @@
-#ifndef TRANSPORT_HPP_
-#define TRANSPORT_HPP_
+#ifndef BARBAROSSA_TRANSPORT_HPP_
+#define BARBAROSSA_TRANSPORT_HPP_
+
+#include <string>
 
 #include "barbarossa/message.hpp"
 
@@ -7,7 +9,7 @@ namespace barbarossa::controlchannel {
 
 class NetworkError : public std::exception {
  public:
-  NetworkError(const std::string& message) : message_(message) {}
+  explicit NetworkError(const std::string& message) : message_(message) {}
 
   const char* what() const throw() { return message_.c_str(); }
 
@@ -28,4 +30,4 @@ class Transport {
 
 }  // namespace barbarossa::controlchannel
 
-#endif  // TRANSPORT_HPP_
+#endif  // BARBAROSSA_TRANSPORT_HPP_

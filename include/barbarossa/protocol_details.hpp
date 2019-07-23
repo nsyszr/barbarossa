@@ -1,5 +1,5 @@
-#ifndef PROTOCOL_DETAILS_HPP__
-#define PROTOCOL_DETAILS_HPP__
+#ifndef BARBAROSSA_PROTOCOL_DETAILS_HPP__
+#define BARBAROSSA_PROTOCOL_DETAILS_HPP__
 
 #include <string>
 #include <string_view>
@@ -75,4 +75,4 @@ inline void from_json(const json& j, WelcomeDetails& d) {
 
 }  // namespace barbarossa::controlchannel::v1::protocol
 
-#endif  // PROTOCOL_DETAILS_HPP__
+#endif  // BARBAROSSA_PROTOCOL_DETAILS_HPP__
