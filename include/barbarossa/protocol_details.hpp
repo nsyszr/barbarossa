@@ -1,5 +1,8 @@
-#ifndef BARBAROSSA_PROTOCOL_DETAILS_HPP__
-#define BARBAROSSA_PROTOCOL_DETAILS_HPP__
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
+#ifndef BARBAROSSA_PROTOCOL_DETAILS_HPP_
+#define BARBAROSSA_PROTOCOL_DETAILS_HPP_
 
 #include <string>
 #include <string_view>
@@ -75,4 +78,4 @@ inline void from_json(const json& j, WelcomeDetails& d) {
 
 }  // namespace barbarossa::controlchannel::v1::protocol
 
-#endif  // BARBAROSSA_PROTOCOL_DETAILS_HPP__
+#endif  // BARBAROSSA_PROTOCOL_DETAILS_HPP_

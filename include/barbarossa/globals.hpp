@@ -1,3 +1,6 @@
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
 #ifndef BARBAROSSA_GLOBALS_HPP_
 #define BARBAROSSA_GLOBALS_HPP_
 

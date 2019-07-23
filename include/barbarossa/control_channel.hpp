@@ -1,5 +1,8 @@
-#ifndef BARBAROSSA_CONTROLCHANNEL_HPP_
-#define BARBAROSSA_CONTROLCHANNEL_HPP_
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
+#ifndef BARBAROSSA_CONTROL_CHANNEL_HPP_
+#define BARBAROSSA_CONTROL_CHANNEL_HPP_
 
 #include <condition_variable>
 #include <cstdint>
@@ -431,7 +434,8 @@ class ControlChannel {
                   // time.
         }
       }
-    }).detach();
+    })
+        .detach();
   }
 
   // Handle incoming messages
@@ -537,4 +541,4 @@ class ControlChannel {
 
 }  // namespace barbarossa::controlchannel::v1
 
-#endif  // CONTROLCHANNEL_HPP_
+#endif  // BARBAROSSA_CONTROL_CHANNEL_HPP_

@@ -1,3 +1,6 @@
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
 #ifndef BARBAROSSA_WEBSOCKET_ENDPOINT_HPP_
 #define BARBAROSSA_WEBSOCKET_ENDPOINT_HPP_
 
@@ -21,7 +24,7 @@ class WebsocketEndpoint {
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
-  WebsocketEndpoint(const std::string& uri);
+  explicit WebsocketEndpoint(const std::string& uri);
   ~WebsocketEndpoint();
 
   bool Connect();

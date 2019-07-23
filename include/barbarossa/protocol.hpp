@@ -36,7 +36,7 @@ class BasicMessage {
 
   // Hide the constructor
   BasicMessage() {}
-  explict BasicMessage(const json& j) : j_(j) {}
+  explicit BasicMessage(const json& j) : j_(j) {}
 
  public:
   MessageTypes GetMessageType() {
@@ -300,7 +300,7 @@ class PingMessage {
   PingMessage() : details_(json::object()) {}
   explicit PingMessage(const json& details) : details_(details) {}
   template <typename T>
-  PingMessage(const T& details) : details_(details) {}
+  explicit PingMessage(const T& details) : details_(details) {}
 
   inline bool operator==(const PingMessage& rhs) const {
     return tie() == rhs.tie();
@@ -366,7 +366,7 @@ class PongMessage {
   PongMessage() : details_(json::object()) {}
   explicit PongMessage(const json& details) : details_(details) {}
   template <typename T>
-  PongMessage(const T& details) : details_(details) {}
+  explicit PongMessage(const T& details) : details_(details) {}
 
   inline bool operator==(const PongMessage& rhs) const {
     return tie() == rhs.tie();

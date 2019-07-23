@@ -1,5 +1,10 @@
-#ifndef BARBAROSSA_ZMQUTILS_HPP_
-#define BARBAROSSA_ZMQUTILS_HPP_
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
+#ifndef BARBAROSSA_ZMQ_UTILS_HPP_
+#define BARBAROSSA_ZMQ_UTILS_HPP_
+
+#include <string>
 
 #include "zmq.hpp"
 
@@ -36,4 +41,4 @@ inline std::string RecvString(zmq::socket_t& socket,
 
 }  // namespace barbarossa::zmqutils
 
-#endif  // BARBAROSSA_ZMQUTILS_HPP_
+#endif  // BARBAROSSA_ZMQ_UTILS_HPP_

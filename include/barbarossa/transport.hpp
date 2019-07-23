@@ -1,3 +1,6 @@
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
 #ifndef BARBAROSSA_TRANSPORT_HPP_
 #define BARBAROSSA_TRANSPORT_HPP_
 

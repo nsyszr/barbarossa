@@ -1,3 +1,6 @@
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
 #ifndef BARBAROSSA_MESSAGE_HPP_
 #define BARBAROSSA_MESSAGE_HPP_
 

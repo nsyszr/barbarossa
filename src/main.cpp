@@ -1,3 +1,6 @@
+// Copyright (c) 2018 by nsyszr.io.
+// Author: dgl
+
 #include <condition_variable>
 #include <csignal>
 #include <future>
