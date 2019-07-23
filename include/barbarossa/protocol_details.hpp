@@ -65,10 +65,10 @@ inline void to_json(json& j, const WelcomeDetails& d) {
 }  // namespace welcomedetails
 
 inline void from_json(const json& j, WelcomeDetails& d) {
-  j.at("session_timeout").get_to(d.session_timeout_);
-  j.at("ping_interval").get_to(d.ping_interval_);
-  j.at("pong_max_wait_time").get_to(d.pong_timeout_);
-  j.at("events_topic").get_to(d.events_topic_);
+  d.session_timeout_ = j.at("session_timeout").get<int>();
+  d.ping_interval_ = j.at("ping_interval").get<int>();
+  d.pong_timeout_ = j.at("pong_max_wait_time").get<int>();
+  d.events_topic_ = j.at("events_topic").get<std::string>();
 }
 
 }  // namespace welcomedetails

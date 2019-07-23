@@ -2,6 +2,7 @@
 #define WEBSOCKET_ENDPOINT_HPP_
 
 #include <functional>
+#include <string>
 
 #include "websocketpp/client.hpp"
 // #include "websocketpp/common/memory.hpp"
@@ -68,8 +69,7 @@ class WebsocketEndpoint {
   void OnClose(websocketpp::connection_hdl);
   void OnFail(websocketpp::connection_hdl);
   void OnMessage(websocketpp::connection_hdl, message_ptr msgp);
-  context_ptr WebsocketEndpoint::OnTLSInit(const char* hostname,
-                                           websocketpp::connection_hdl);
+  context_ptr OnTLSInit(/*const char* hostname, websocketpp::connection_hdl*/);
 };
 
 }  // namespace barbarossa::controlchannel::v1

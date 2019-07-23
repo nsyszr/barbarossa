@@ -8,6 +8,8 @@
 
 #define ASIO_STANDALONE
 
+#include "asio.hpp"
+#include "asio/ssl.hpp"
 #include "spdlog/spdlog.h"
 #include "websocketpp/common/memory.hpp"
 #include "websocketpp/common/thread.hpp"
@@ -37,9 +39,8 @@ bool WebsocketEndpoint::Connect() {
       bind(&WebsocketEndpoint::OnMessage, this, _1, _2));
 
   // Temporary code
-  endpoint_.set_tls_init_handler([&](const char*, websocketpp::connection_hdl) {
+  endpoint_.set_tls_init_handler(bind(&WebsocketEndpoint::OnTLSInit, this));
 
-  });
   endpoint_.start_perpetual();
   thread_.reset(new websocketpp::lib::thread(&client::run, &endpoint_));
 
@@ -149,5 +150,19 @@ void WebsocketEndpoint::OnMessage(websocketpp::connection_hdl,
 }
 
 WebsocketEndpoint::context_ptr WebsocketEndpoint::OnTLSInit(
-    const char* hostname, websocketpp::connection_hdl) {}
+    /*const char* hostname, websocketpp::connection_hdl*/) {
+  // establishes a SSL connection
+  context_ptr ctx =
+      std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+
+  try {
+    ctx->set_options(
+        asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 |
+        asio::ssl::context::no_sslv3 | asio::ssl::context::single_dh_use);
+  } catch (std::exception& e) {
+    std::cout << "Error in context pointer: " << e.what() << std::endl;
+  }
+  return ctx;
+}
+
 }  // namespace barbarossa::controlchannel::v1

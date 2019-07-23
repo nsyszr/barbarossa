@@ -18,10 +18,10 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -flto -ffunction-sections -fdata-sections")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra") # -flto -ffunction-sections -fdata-sections
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-Os -msse4")
-link_libraries("-flto -Wl,--gc-sections")
+# link_libraries("-flto -Wl,--gc-sections")
 
 # set(CMAKE_BUILD_TYPE Release)
 # set(CMAKE_CXX_FLAGS "-msse4 -O2 -Wall -Wextra -flto -ffunction-sections -fdata-sections")
@@ -29,8 +29,13 @@ link_libraries("-flto -Wl,--gc-sections")
 # link_libraries("-flto -Wl,--gc-sections")
 # n -ffunction-section & -fdata-sections options of gcc ...
 
+# For Mac OS
+include_directories("/usr/local/include")
+link_directories("/usr/local/lib")
+
 # Include files
 include_directories("${PROJECT_SOURCE_DIR}/include")
+
 # Source files
 file(GLOB SOURCES "src/*.cpp")
 
@@ -74,6 +79,7 @@ target_include_directories(zmq PUBLIC thirdparty/libzmq/include)
 
 #add_custom_target(zmq COMMAND make thirdparty/libzmq/build)
 add_library(libzmqxx STATIC IMPORTED)
+set_target_properties(libzmqxx PROPERTIES LINKER_LANGUAGE CXX)
 set_property(TARGET libzmqxx PROPERTY IMPORTED_LOCATION build/thirdparty/libzmq/lib/libzmq.a)
 
 # cppzmq
@@ -86,4 +92,4 @@ include_directories(thirdparty/cppzmq)
 
 # barbarossa
 add_executable(barbarossa ${SOURCES})
-target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmqxx ssl crypto)
+target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmq ssl crypto) #libzmqxx
