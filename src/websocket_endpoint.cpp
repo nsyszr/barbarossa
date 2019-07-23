@@ -36,6 +36,10 @@ bool WebsocketEndpoint::Connect() {
   endpoint_.set_message_handler(
       bind(&WebsocketEndpoint::OnMessage, this, _1, _2));
 
+  // Temporary code
+  endpoint_.set_tls_init_handler([&](const char*, websocketpp::connection_hdl) {
+
+  });
   endpoint_.start_perpetual();
   thread_.reset(new websocketpp::lib::thread(&client::run, &endpoint_));
 
@@ -144,4 +148,6 @@ void WebsocketEndpoint::OnMessage(websocketpp::connection_hdl,
   }
 }
 
+WebsocketEndpoint::context_ptr WebsocketEndpoint::OnTLSInit(
+    const char* hostname, websocketpp::connection_hdl) {}
 }  // namespace barbarossa::controlchannel::v1

@@ -423,7 +423,8 @@ int main(/*int argc, char* argv[]*/) {
 
 
   using namespace barbarossa::controlchannel::v1;
-  WebsocketEndpoint endpoint("ws://localhost:4001/devicecontrol/v1");
+  WebsocketEndpoint endpoint(
+      "wss://barkeeper-latest.test-insys-tec.net/devicecontrol/v1");
   ControlChannel<WebsocketEndpoint> control_channel(endpoint);
   control_channel.Run();
 

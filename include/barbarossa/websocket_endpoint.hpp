@@ -7,13 +7,16 @@
 // #include "websocketpp/common/memory.hpp"
 // #include "websocketpp/common/thread.hpp"
 #define ASIO_STANDALONE
-#include "websocketpp/config/asio_no_tls_client.hpp"
+#include "websocketpp/config/asio_client.hpp"
+// #include "websocketpp/config/asio_no_tls_client.hpp"
 
 namespace barbarossa::controlchannel::v1 {
 
 class WebsocketEndpoint {
  public:
-  typedef websocketpp::client<websocketpp::config::asio_client> client;
+  typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+  typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
+      context_ptr;
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
@@ -65,6 +68,8 @@ class WebsocketEndpoint {
   void OnClose(websocketpp::connection_hdl);
   void OnFail(websocketpp::connection_hdl);
   void OnMessage(websocketpp::connection_hdl, message_ptr msgp);
+  context_ptr WebsocketEndpoint::OnTLSInit(const char* hostname,
+                                           websocketpp::connection_hdl);
 };
 
 }  // namespace barbarossa::controlchannel::v1

@@ -86,4 +86,4 @@ include_directories(thirdparty/cppzmq)
 
 # barbarossa
 add_executable(barbarossa ${SOURCES})
-target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmqxx)
+target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmqxx ssl crypto)
