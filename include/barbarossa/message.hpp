@@ -1,29 +1,42 @@
 #ifndef MESSAGE_HPP_
 #define MESSAGE_HPP_
 
-template <typename T>
+#include <cstdint>
+#include <vector>
+
+#include "nlohmann/json.hpp"
+
+namespace barbarossa::controlchannel {
+
+using json = nlohmann::json;
+
 class Message {
  public:
-  using MessageFields = std::vector<T>;
+  using MessageFields = std::vector<json>;
 
-  virtual ~Message() = default;
-  Message(std::size_t num_fields) = 0;
-  Message(MessageFields&& fields) = 0;
+  explicit Message(std::size_t num_fields);
+  explicit Message(MessageFields&& fields);
 
   Message& operator=(const Message& other) = delete;
-  Message& operator=(Message&& other) = 0;
+  Message& operator=(Message&& other);
 
-  virtual const T& Field(std::size_t index) const = 0;
+  const json& Field(std::size_t index) const;
   template <typename Type>
   Type Field(std::size_t index);
 
   template <typename Type>
-  void SetField(std::size_t index, const Type& type) = 0;
+  void SetField(std::size_t index, const Type& type);
 
-  std::size_t Size() const = 0;
+  std::size_t Size() const;
 
-  const MessageFields& Fields() const = 0;
-  MessageFields&& Fields() = 0;
+  const MessageFields& Fields() const;
+  MessageFields&& Fields();
+
+ private:
+  MessageFields fields_;
 };
 
+}  // namespace barbarossa::controlchannel
+
+#include "barbarossa/message.ipp"
 #endif  // MESSAGE_HPP_

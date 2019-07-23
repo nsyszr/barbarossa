@@ -46,6 +46,7 @@ file(GLOB SOURCES "src/*.cpp")
 
 # JSON
 set(JSON_BuildTests OFF CACHE INTERNAL "")
+include_directories(thirdparty/json/single_include)
 add_subdirectory(thirdparty/json)
 
 # Websocketpp

@@ -6,8 +6,8 @@
 
 #include "barbarossa/control_channel.hpp"
 #include "barbarossa/globals.hpp"
-#include "barbarossa/transport.hpp"
 #include "barbarossa/websocket_endpoint.hpp"
+#include "barbarossa/websocket_transport.hpp"
 #include "barbarossa/zmq_utils.hpp"
 #include "spdlog/spdlog.h"
 
