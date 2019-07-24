@@ -136,8 +136,11 @@ class InvalidOperationError : public std::exception {
 template <typename T>
 class ControlChannel {
  public:
-  explicit ControlChannel(T &endpoint)
-      : endpoint_(endpoint), state_(kControlChannelStatePending), context_(1) {
+  ControlChannel(T &endpoint, const std::string &realm)
+      : endpoint_(endpoint),
+        realm_(realm),
+        state_(kControlChannelStatePending),
+        context_(1) {
     // We bind the handler with lambda since they raise only an event
     endpoint_.set_on_open_handler(
         [&]() { RaiseEvent(kControlChannelEventOnOpen); });
@@ -239,6 +242,7 @@ class ControlChannel {
  private:
   // Keep the order of ctor initialization
   T &endpoint_;
+  std::string realm_;
   ControlChannelStates state_;
   zmq::context_t context_;
 
@@ -351,7 +355,7 @@ class ControlChannel {
 
   void InitiateSession() {
     // Send hello message to server
-    auto hello_msg = protocol::HelloMessage("test@test");
+    auto hello_msg = protocol::HelloMessage(realm_);
     json j = hello_msg;
     endpoint_.Send(j.dump());
 

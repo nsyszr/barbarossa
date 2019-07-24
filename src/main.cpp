@@ -187,8 +187,14 @@ bool RequestPingPong(zmq::context_t& context) {
 }
 
 
-int main(/*int argc, char* argv[]*/) {
+int main(int argc, char* argv[]) {
   spdlog::set_level(spdlog::level::debug);
+
+  if (argc <= 2) {
+    std::cout << "Please provide the device control URI and device realm"
+              << std::endl;
+    return 1;
+  }
 
   // using json = nlohmann::json;
   // using namespace barbarossa::controlchannel::v1::protocol;
@@ -426,9 +432,8 @@ int main(/*int argc, char* argv[]*/) {
 
 
   using namespace barbarossa::controlchannel::v1;
-  WebsocketEndpoint endpoint(
-      "wss://barkeeper-latest.test-insys-tec.net/devicecontrol/v1");
-  ControlChannel<WebsocketEndpoint> control_channel(endpoint);
+  WebsocketEndpoint endpoint(argv[1]);
+  ControlChannel<WebsocketEndpoint> control_channel(endpoint, argv[2]);
   control_channel.Run();
 
   return 0;
