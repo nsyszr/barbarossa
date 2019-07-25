@@ -1,5 +1,5 @@
-// Copyright (c) 2018 by nsyszr.io.
-// Author: dgl
+// Copyright (c) 2019 by nsyszr.io.
+// Author: Tschokko
 
 #ifndef BARBAROSSA_MESSAGE_HANDLER_HPP_
 #define BARBAROSSA_MESSAGE_HANDLER_HPP_

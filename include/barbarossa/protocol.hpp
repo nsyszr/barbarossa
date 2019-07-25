@@ -1,5 +1,5 @@
-// Copyright (c) 2018 by nsyszr.io.
-// Author: dgl
+// Copyright (c) 2019 by nsyszr.io.
+// Author: Tschokko
 
 #ifndef BARBAROSSA_PROTOCOL_HPP_
 #define BARBAROSSA_PROTOCOL_HPP_

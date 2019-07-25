@@ -1,5 +1,11 @@
-// Copyright (c) 2018 by nsyszr.io.
-// Author: dgl
+// Copyright (c) 2019 by nsyszr.io.
+// Author: Tschokko
+//
+// Following code is rewritten based on the following Autobahn proven C++ WAMP
+// implementation: https://github.com/crossbario/autobahn-cpp
+// The control channel protocol is subset and slightly modified WAMP protocol
+// optimized for our purporses. Therefore we cannot use a WAMP compliant client
+// implementation.
 
 #ifndef BARBAROSSA_MESSAGE_HPP_
 #define BARBAROSSA_MESSAGE_HPP_

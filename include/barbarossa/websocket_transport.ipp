@@ -1,5 +1,11 @@
-// Copyright (c) 2018 by nsyszr.io.
-// Author: dgl
+// Copyright (c) 2019 by nsyszr.io.
+// Author: Tschokko
+//
+// Following code is rewritten based on the following Autobahn proven C++ WAMP
+// implementation: https://github.com/crossbario/autobahn-cpp
+// The control channel protocol is subset and slightly modified WAMP protocol
+// optimized for our purporses. Therefore we cannot use a WAMP compliant client
+// implementation.
 
 #include <exception>
 
@@ -70,6 +76,28 @@ inline bool WebSocketTransport::IsConnected() const { return open_ && !done_; }
 
 inline void WebSocketTransport::SendMessage(Message&& message) {}
 
-inline bool WebSocketTransport::HasHandler() const { return false; }
+inline void WebSocketTransport::Attach(
+    const std::shared_ptr<TransportHandler>& handler) {
+  if (handler_) {
+    throw std::logic_error("handler already attached");
+  }
+
+  handler_ = handler;
+  handler_->OnAttach(shared_from_this());
+}
+
+inline void WebSocketTransport::Detach() {
+  if (handler_) {
+    throw std::logic_error("no handler attached");
+  }
+
+  // TODO(DGL) Useful reason for detaching a handler???
+  handler_->OnDetach("goodbye");
+  handler_.reset();
+}
+
+inline bool WebSocketTransport::HasHandler() const {
+  return handler_ != nullptr;
+}
 
 }  // namespace barbarossa::controlchannel
