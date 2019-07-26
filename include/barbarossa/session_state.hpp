@@ -4,6 +4,8 @@
 #ifndef BARBAROSSA_SESSION_STATE_HPP_
 #define BARBAROSSA_SESSION_STATE_HPP_
 
+#include <string>
+
 namespace barbarossa::controlchannel {
 
 enum class SessionState : int {
@@ -11,9 +13,11 @@ enum class SessionState : int {
   kEstablishing,
   kEstablished,
   kClosing,
-  kFailed,
 };
+
+std::string ToString(SessionState state);
 
 }  // namespace barbarossa::controlchannel
 
+#include "barbarossa/session_state.ipp"
 #endif  // BARBAROSSA_SESSION_STATE_HPP_

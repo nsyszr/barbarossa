@@ -9,23 +9,33 @@
 
 #include <exception>
 
+#include "barbarossa/errors.hpp"
 #include "barbarossa/message.hpp"
 #include "barbarossa/transport.hpp"
+#include "spdlog/spdlog.h"
 
 namespace barbarossa::controlchannel {
 
-inline WebSocketTransport::WebSocketTransport(const std::string& uri)
-    : uri_(uri), open_(false), done_(false) {
+template <typename CONFIG>
+inline WebSocketTransport<CONFIG>::WebSocketTransport(client_type& endpoint,
+                                                      const std::string& uri)
+    : endpoint_(endpoint), uri_(uri), open_(false), done_(false) {
   // On websocket is open handler sets a successfull connected promise to tell
   // our Connect method that our connection is established.
-  endpoint_.set_open_handler([&](websocketpp::connection_hdl) {
+  /*endpoint_.set_open_handler([&](websocketpp::connection_hdl) {
+    spdlog::debug("transport on open");
     scoped_lock guard(lock_);
     open_ = true;
     connected_.set_value();  // Release successfully the Connect() method
-  });
+  });*/
+  using websocketpp::lib::bind;
+  using websocketpp::lib::placeholders::_1;
+  endpoint_.set_open_handler(
+      bind(&WebSocketTransport<CONFIG>::OnEndpointOpen, this, _1));
 
   // On websocket is close handler sets our transport state to disconnected.
   endpoint_.set_close_handler([&](websocketpp::connection_hdl) {
+    spdlog::debug("transport on close");
     scoped_lock guard(lock_);
     done_ = true;
   });
@@ -33,23 +43,46 @@ inline WebSocketTransport::WebSocketTransport(const std::string& uri)
   // On websocket is fail handler sets an exception to our connected promise to
   // tell our Connect method that the connection failed.
   endpoint_.set_fail_handler([&](websocketpp::connection_hdl) {
+    spdlog::debug("transport on fail");
     if (!open_) {
       // Release the Connect() method with a failure
       connected_.set_exception(std::make_exception_ptr(
-          NetworkError("network transport failed to connect")));
+          NetworkError(ErrorMessages::kTransportConnectionFailed)));
     }
     scoped_lock guard(lock_);
     done_ = true;
   });
+
+  endpoint_.set_tls_init_handler([](websocketpp::connection_hdl) {
+    spdlog::debug("endpoint tls init handler");
+
+    context_ptr ctx =
+        std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+
+    try {
+      ctx->set_options(asio::ssl::context::default_workarounds |
+                       asio::ssl::context::no_sslv2 |
+                       asio::ssl::context::no_sslv3 |
+                       asio::ssl::context::single_dh_use);
+    } catch (std::exception& e) {
+      std::cout << "Error in context pointer: " << e.what() << std::endl;
+    }
+    return ctx;
+  });
+
+  endpoint_.start_perpetual();
+  thread_.reset(new websocketpp::lib::thread(&client_type::run, &endpoint_));
 }
 
-inline void WebSocketTransport::Connect() {
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::Connect() {
+  spdlog::debug("transport connecting");
   if (open_) {
-    throw NetworkError("network transport already connected");
+    throw std::logic_error(ErrorMessages::kTransportAlreadyConnected);
   }
 
   websocketpp::lib::error_code ec;
-  client::connection_ptr con = endpoint_.get_connection(uri_, ec);
+  typename client_type::connection_ptr con = endpoint_.get_connection(uri_, ec);
   if (ec) {
     throw websocketpp::lib::system_error(ec.value(), ec.category(), "connect");
   }
@@ -62,33 +95,42 @@ inline void WebSocketTransport::Connect() {
 
   // Wait for connected_ promise
   auto connected_future = connected_.get_future();
+
+  spdlog::debug("transport connected and waiting for on open");
   connected_future.get();  // This future can throw an exception
 }
 
-inline void WebSocketTransport::Disconnect() {
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::Disconnect() {
   if (open_) {
-    throw NetworkError("network transport already disconnected");
+    throw std::logic_error(ErrorMessages::kTransportAlreadyDisconnected);
   }
   endpoint_.close(hdl_, websocketpp::close::status::normal, "disconnect");
 }
 
-inline bool WebSocketTransport::IsConnected() const { return open_ && !done_; }
+template <typename CONFIG>
+inline bool WebSocketTransport<CONFIG>::IsConnected() const {
+  return open_ && !done_;
+}
 
-inline void WebSocketTransport::SendMessage(Message&& message) {}
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::SendMessage(Message&& message) {}
 
-inline void WebSocketTransport::Attach(
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::Attach(
     const std::shared_ptr<TransportHandler>& handler) {
   if (handler_) {
-    throw std::logic_error("handler already attached");
+    throw std::logic_error(ErrorMessages::kTransportHandlerAlreadyAttached);
   }
 
   handler_ = handler;
-  handler_->OnAttach(shared_from_this());
+  handler_->OnAttach(GetSharedPtr());
 }
 
-inline void WebSocketTransport::Detach() {
-  if (handler_) {
-    throw std::logic_error("no handler attached");
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::Detach() {
+  if (!handler_) {
+    throw std::logic_error(ErrorMessages::kTransportHandlerAlreadyDetached);
   }
 
   // TODO(DGL) Useful reason for detaching a handler???
@@ -96,8 +138,18 @@ inline void WebSocketTransport::Detach() {
   handler_.reset();
 }
 
-inline bool WebSocketTransport::HasHandler() const {
+template <typename CONFIG>
+inline bool WebSocketTransport<CONFIG>::HasHandler() const {
   return handler_ != nullptr;
+}
+
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::OnEndpointOpen(
+    websocketpp::connection_hdl) {
+  spdlog::debug("transport on open");
+  scoped_lock guard(lock_);
+  open_ = true;
+  connected_.set_value();
 }
 
 }  // namespace barbarossa::controlchannel

@@ -9,6 +9,9 @@
 
 #include "barbarossa/control_channel.hpp"
 #include "barbarossa/globals.hpp"
+#include "barbarossa/session.hpp"
+#include "barbarossa/transport.hpp"
+#include "barbarossa/transport_handler.hpp"
 #include "barbarossa/websocket_endpoint.hpp"
 #include "barbarossa/websocket_transport.hpp"
 #include "barbarossa/zmq_utils.hpp"
@@ -431,10 +434,37 @@ int main(int argc, char* argv[]) {
   // t1.join();
 
 
-  using namespace barbarossa::controlchannel::v1;
+  /* using namespace barbarossa::controlchannel::v1;
   WebsocketEndpoint endpoint(argv[1]);
   ControlChannel<WebsocketEndpoint> control_channel(endpoint, argv[2]);
-  control_channel.Run();
+  control_channel.Run(); */
+  typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+  using namespace barbarossa::controlchannel;
+
+  asio::io_service io;
+
+  client endpoint;
+  endpoint.init_asio(&io);
+  spdlog::info("endpoint ready");
+
+  auto transport = std::make_shared<
+      WebSocketTransport<websocketpp::config::asio_tls_client>>(endpoint,
+                                                                argv[1]);
+  spdlog::info("transport ready");
+
+  auto session = std::make_shared<Session>(io);
+
+  transport->Attach(std::static_pointer_cast<TransportHandler>(session));
+  transport->Connect();
+  spdlog::info("transport connected");
+
+  session->Start();
+  spdlog::info("session started");
+
+  session->Join(argv[2]);
+  spdlog::info("session joined");
+
+  io.run();
 
   return 0;
 }

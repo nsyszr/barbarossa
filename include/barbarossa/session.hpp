@@ -15,19 +15,22 @@
 #include <memory>
 #include <string>
 
+#define ASIO_STANDALONE
 #include "asio.hpp"
-#include "session_state.hpp"
-#include "transport.hpp"
-#include "transport_handler.hpp"
+#include "barbarossa/session_state.hpp"
+#include "barbarossa/transport.hpp"
+#include "barbarossa/transport_handler.hpp"
 
 namespace barbarossa::controlchannel {
 
 const std::chrono::seconds kSessionDefaultRequestTimeout{16};
 
-class Session : public TransportHandler, std::enable_shared_from_this<Session> {
+class Session : public TransportHandler,
+                public std::enable_shared_from_this<Session> {
  public:
   explicit Session(asio::io_service& io_service);
 
+  void Start();
   // Join sends the hello message and waits for response
   uint32_t Join(const std::string& realm);
 
@@ -38,17 +41,21 @@ class Session : public TransportHandler, std::enable_shared_from_this<Session> {
   void OnMessage(Message&& message);
 
   void EnsureState(SessionState state);
+  SessionState CurrentState();
 
+  void SendMessage(Message&& message, bool session_established = true);
   void ProcessWelcomeMessage(Message&& message);
 
   asio::io_service& io_service_;
   SessionState state_;
+  bool running_;
   uint32_t session_id_;
   std::chrono::seconds request_timeout_;
 
   std::mutex state_mutex_;
   std::shared_ptr<Transport> transport_;
   std::promise<uint32_t> joined_;
+  std::promise<void> started_;
 };
 
 }  // namespace barbarossa::controlchannel

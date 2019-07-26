@@ -18,6 +18,8 @@
 
 namespace barbarossa::controlchannel {
 
+class Transport;
+
 class TransportHandler {
  public:
   virtual ~TransportHandler() = default;

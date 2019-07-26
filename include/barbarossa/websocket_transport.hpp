@@ -23,14 +23,18 @@
 
 namespace barbarossa::controlchannel {
 
-class WebSocketTransport : public Transport,
-                           std::enable_shared_from_this<WebSocketTransport> {
+template <typename CONFIG>
+class WebSocketTransport
+    : public Transport,
+      public std::enable_shared_from_this<WebSocketTransport<CONFIG>> {
  public:
-  typedef websocketpp::client<websocketpp::config::asio_client> client;
+  typedef websocketpp::client<CONFIG> client_type;
   typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
+  typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
+      context_ptr;
   typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 
-  explicit WebSocketTransport(const std::string& uri);
+  WebSocketTransport(client_type& client, const std::string& uri);
 
   void Connect() override;
   void Disconnect() override;
@@ -41,11 +45,17 @@ class WebSocketTransport : public Transport,
   bool HasHandler() const override;
 
  private:
+  std::shared_ptr<WebSocketTransport<CONFIG>> GetSharedPtr() {
+    return this->shared_from_this();
+  }
+  void OnEndpointOpen(websocketpp::connection_hdl);
+
+  client_type& endpoint_;
   std::string uri_;
   bool open_;
   bool done_;
 
-  client endpoint_;
+  websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
   websocketpp::lib::mutex lock_;
   websocketpp::connection_hdl hdl_;
   std::shared_ptr<TransportHandler> handler_;
