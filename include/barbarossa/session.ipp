@@ -225,40 +225,44 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
 inline void Session::HearbeatController() {
   spdlog::debug("hearbeat: controller thread start");
 
-  std::condition_variable ping_or_die;
-  std::mutex ping_or_die_mutex;
+  std::promise<void> heartbeat;
+  auto hearbeat_future = heartbeat.get_future();
 
-  auto heartbeat_future = std::async([&]() {
+  std::async([&]() {
     while (true) {
-      std::unique_lock<std::mutex> lock(ping_or_die_mutex);
+      std::unique_lock<std::mutex> lock(stop_signal_mutex_);
       spdlog::debug("heartbeat: wait until sending ping or die.");
 
       // We send every given seconds a ping or we stop the hearbeat
-      if (ping_or_die.wait_for(lock, std::chrono::seconds(20)) ==
+      if (stop_signal_.wait_for(lock, std::chrono::seconds(20)) ==
           std::cv_status::no_timeout) {
         spdlog::info(
             "heartbeat: received the die condition and terminate now.");
-        break;  // Exit the loop because ping_or_die condition is set
+
+        heartbeat.set_value();
+        break;  // Exit the loop because stop_signal_ is set
       }
 
       Message ping_message(2);
       ping_message.SetField<MessageType>(0, MessageType::kPing);
       ping_message.SetField<json::object_t>(1, json::object());
+
       try {
         SendMessage(std::move(ping_message));
       } catch (const NetworkError& e) {
         spdlog::debug("heartbeat: we have network error!");
-        break;
+
+        heartbeat.set_exception(std::make_exception_ptr(e));
+        break;  // Exit the loop because we caught an exception
       }
     }
   });
 
-  // Wait until we receive a stop signal
-  std::unique_lock<std::mutex> lock(stop_signal_mutex_);
-  stop_signal_.wait(lock);
-
-  // Tell our async routine above to die
-  ping_or_die.notify_one();
+  try {
+    hearbeat_future.get();
+  } catch (const NetworkError& e) {
+    spdlog::debug("heartbeat controller: we have network error!");
+  }
 }
 
 }  // namespace barbarossa::controlchannel
