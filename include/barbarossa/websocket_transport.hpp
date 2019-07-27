@@ -28,13 +28,14 @@ class WebSocketTransport
     : public Transport,
       public std::enable_shared_from_this<WebSocketTransport<CONFIG>> {
  public:
-  typedef websocketpp::client<CONFIG> client_type;
-  typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
-  typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
-      context_ptr;
-  typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
+  typedef websocketpp::client<CONFIG> client_t;
+  typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock_t;
+  typedef websocketpp::config::asio_client::message_type::ptr message_ptr_t;
 
-  WebSocketTransport(client_type& client, const std::string& uri);
+  // It's best practise to pass the websocketpp client as non-const reference.
+  WebSocketTransport(client_t& client, const std::string& uri);  // NOLINT
+
+  ~WebSocketTransport();
 
   void Connect() override;
   void Disconnect() override;
@@ -48,12 +49,15 @@ class WebSocketTransport
   std::shared_ptr<WebSocketTransport<CONFIG>> GetSharedPtr() {
     return this->shared_from_this();
   }
-  void OnEndpointOpen(websocketpp::connection_hdl);
+  void StartClient();
+  void StopClient(const std::string& reason) noexcept;
+  void RecvMessage(const std::string& payload);
 
-  client_type& endpoint_;
+  client_t& client_;
   std::string uri_;
   bool open_;
   bool done_;
+  bool closed_;
 
   websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
   websocketpp::lib::mutex lock_;

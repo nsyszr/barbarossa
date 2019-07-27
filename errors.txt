@@ -1,0 +1,112 @@
+[  1%] Built target zmq
+[ 94%] Built target objects
+[ 95%] Built target libzmq
+Scanning dependencies of target barbarossa
+[ 95%] Building CXX object CMakeFiles/barbarossa.dir/src/main.cpp.o
+In file included from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.hpp:63:0,
+                 from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:10:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp: In constructor ‘barbarossa::controlchannel::Session::Session(asio::io_service&)’:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp:39:24: error: ‘kSessionDefaultRequestTimeout’ was not declared in this scope
+       request_timeout_(kSessionDefaultRequestTimeout) {}
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp: In lambda function:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp:100:74: warning: ‘std::__exception_ptr::exception_ptr std::copy_exception(_Ex) [with _Ex = std::exception]’ is deprecated [-Wdeprecated-declarations]
+       joined_.set_exception(std::make_exception_ptr(std::copy_exception(e)));
+                                                                          ^
+In file included from /usr/include/c++/7/exception:142:0,
+                 from /usr/include/c++/7/stdexcept:38,
+                 from /usr/include/c++/7/system_error:41,
+                 from /usr/include/c++/7/bits/std_mutex.h:39,
+                 from /usr/include/c++/7/condition_variable:39,
+                 from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:4:
+/usr/include/c++/7/bits/exception_ptr.h:220:5: note: declared here
+     copy_exception(_Ex __ex) _GLIBCXX_USE_NOEXCEPT
+     ^~~~~~~~~~~~~~
+In file included from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.hpp:63:0,
+                 from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:10:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp: In member function ‘virtual void barbarossa::controlchannel::Session::OnDetach(const string&)’:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp:128:50: warning: unused parameter ‘reason’ [-Wunused-parameter]
+ inline void Session::OnDetach(const std::string& reason) {
+                                                  ^~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp: In member function ‘void barbarossa::controlchannel::Session::EnsureState(barbarossa::controlchannel::SessionState)’:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp:182:70: error: cannot convert ‘barbarossa::controlchannel::SessionState’ to ‘barbarossa::controlchannel::MessageType’ for argument ‘1’ to ‘std::__cxx11::string barbarossa::controlchannel::ToString(barbarossa::controlchannel::MessageType)’
+   spdlog::debug("session change state from {} to {}", ToString(state_),
+                                                                      ^
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/include/barbarossa/session.ipp:183:31: error: cannot convert ‘barbarossa::controlchannel::SessionState’ to ‘barbarossa::controlchannel::MessageType’ for argument ‘1’ to ‘std::__cxx11::string barbarossa::controlchannel::ToString(barbarossa::controlchannel::MessageType)’
+                 ToString(state));
+                               ^
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp: In function ‘int main(int, char**)’:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:27:52: error: ‘asio_tls_client’ is not a member of ‘websocketpp::config’
+   typedef websocketpp::client<websocketpp::config::asio_tls_client> client_t;
+                                                    ^~~~~~~~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:27:52: note: suggested alternative: ‘asio_client’
+   typedef websocketpp::client<websocketpp::config::asio_tls_client> client_t;
+                                                    ^~~~~~~~~~~~~~~
+                                                    asio_client
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:27:67: error: template argument 1 is invalid
+   typedef websocketpp::client<websocketpp::config::asio_tls_client> client_t;
+                                                                   ^
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:28:64: error: ‘ssl’ is not a member of ‘websocketpp::lib::asio’
+   typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
+                                                                ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:28:76: error: template argument 1 is invalid
+   typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
+                                                                            ^
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:35:10: error: request for member ‘init_asio’ in ‘client’, which is of non-class type ‘client_t {aka int}’
+   client.init_asio(&io);
+          ^~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:40:10: error: request for member ‘set_tls_init_handler’ in ‘client’, which is of non-class type ‘client_t {aka int}’
+   client.set_tls_init_handler([](websocketpp::connection_hdl) {
+          ^~~~~~~~~~~~~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp: In lambda function:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:44:32: error: ‘ssl’ is not a member of ‘asio’
+         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+                                ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:44:14: error: parse error in template argument list
+         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:44:52: error: ‘asio::ssl’ has not been declared
+         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+                                                    ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:47:10: error: base operand of ‘->’ is not a pointer
+       ctx->set_options(asio::ssl::context::default_workarounds |
+          ^~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:47:30: error: ‘asio::ssl’ has not been declared
+       ctx->set_options(asio::ssl::context::default_workarounds |
+                              ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:48:30: error: ‘asio::ssl’ has not been declared
+                        asio::ssl::context::no_sslv2 |
+                              ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:49:30: error: ‘asio::ssl’ has not been declared
+                        asio::ssl::context::no_sslv3 |
+                              ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:50:30: error: ‘asio::ssl’ has not been declared
+                        asio::ssl::context::single_dh_use);
+                              ^~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp: In function ‘int main(int, char**)’:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:60:47: error: ‘asio_tls_client’ is not a member of ‘websocketpp::config’
+       WebSocketTransport<websocketpp::config::asio_tls_client>>(client,
+                                               ^~~~~~~~~~~~~~~
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:60:47: note: suggested alternative: ‘asio_client’
+       WebSocketTransport<websocketpp::config::asio_tls_client>>(client,
+                                               ^~~~~~~~~~~~~~~
+                                               asio_client
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:60:47: error: template argument 1 is invalid
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:61:72: error: no matching function for call to ‘make_shared<<expression error> >(client_t&, char*&)’
+                                                                 argv[1]);
+                                                                        ^
+In file included from /usr/include/c++/7/condition_variable:44:0,
+                 from /home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:4:
+/usr/include/c++/7/bits/shared_ptr.h:703:5: note: candidate: template<class _Tp, class ... _Args> std::shared_ptr<_Tp> std::make_shared(_Args&& ...)
+     make_shared(_Args&&... __args)
+     ^~~~~~~~~~~
+/usr/include/c++/7/bits/shared_ptr.h:703:5: note:   template argument deduction/substitution failed:
+/home/tlx3m3j/src/github.com/nsyszr/barbarossa/src/main.cpp:61:72: error: template argument 1 is invalid
+                                                                 argv[1]);
+                                                                        ^
+CMakeFiles/barbarossa.dir/build.make:62: recipe for target 'CMakeFiles/barbarossa.dir/src/main.cpp.o' failed
+make[2]: *** [CMakeFiles/barbarossa.dir/src/main.cpp.o] Error 1
+CMakeFiles/Makefile2:104: recipe for target 'CMakeFiles/barbarossa.dir/all' failed
+make[1]: *** [CMakeFiles/barbarossa.dir/all] Error 2
+Makefile:129: recipe for target 'all' failed
+make: *** [all] Error 2

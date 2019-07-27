@@ -4,7 +4,7 @@
 #ifndef BARBAROSSA_SESSION_STATE_HPP_
 #define BARBAROSSA_SESSION_STATE_HPP_
 
-#include <string>
+#include "spdlog/fmt/ostr.h"
 
 namespace barbarossa::controlchannel {
 
@@ -15,9 +15,22 @@ enum class SessionState : int {
   kClosing,
 };
 
-std::string ToString(SessionState state);
+// Custom types needs the operator implementation for proper logging (spdlog).
+template <typename OSTREAM>
+OSTREAM& operator<<(OSTREAM& os, const SessionState& state) {
+  switch (state) {
+    case SessionState::kClosed:
+      return os << "CLOSED";
+    case SessionState::kEstablishing:
+      return os << "ESTABLISHING";
+    case SessionState::kEstablished:
+      return os << "ESTABLISHED";
+    case SessionState::kClosing:
+      return os << "CLOSING";
+  }
+  return os << "UNKNOWN";
+}
 
 }  // namespace barbarossa::controlchannel
 
-#include "barbarossa/session_state.ipp"
 #endif  // BARBAROSSA_SESSION_STATE_HPP_

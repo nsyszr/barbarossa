@@ -18,10 +18,10 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra") # -flto -ffunction-sections -fdata-sections
+set(CMAKE_CXX_FLAGS "-Wall -Wextra") 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Os -msse4")
-# link_libraries("-flto -Wl,--gc-sections")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -msse4 -flto -ffunction-sections -fdata-sections")
+link_libraries("-flto -Wl,--gc-sections")
 
 # set(CMAKE_BUILD_TYPE Release)
 # set(CMAKE_CXX_FLAGS "-msse4 -O2 -Wall -Wextra -flto -ffunction-sections -fdata-sections")
@@ -65,25 +65,30 @@ add_subdirectory(thirdparty/websocketpp)
 include_directories(thirdparty/spdlog/include)
 add_subdirectory(thirdparty/spdlog)
 
+#if(NOT TARGET spdlog)
+    # Stand-alone build
+#    find_package(spdlog REQUIRED)
+#endif()
+
 # libzmq
-set(WITH_PERF_TOOL OFF)
-set(ZMQ_BUILD_TESTS OFF)
-set(ENABLE_CPACK OFF)
-include_directories(thirdparty/libzmq/include)
-add_subdirectory(thirdparty/libzmq build/thirdparty/libzmq)
-add_library(zmq STATIC build/thirdparty/libzmq)
-set_target_properties(zmq PROPERTIES LINKER_LANGUAGE CXX)
-target_include_directories(zmq PUBLIC thirdparty/libzmq/include)
+#set(WITH_PERF_TOOL OFF)
+#set(ZMQ_BUILD_TESTS OFF)
+#set(ENABLE_CPACK OFF)
+#include_directories(thirdparty/libzmq/include)
+#add_subdirectory(thirdparty/libzmq build/thirdparty/libzmq)
+#add_library(zmq STATIC build/thirdparty/libzmq)
+#set_target_properties(zmq PROPERTIES LINKER_LANGUAGE CXX)
+#target_include_directories(zmq PUBLIC thirdparty/libzmq/include)
 
 # NOTE: You have to run make in build dir manually !
 
-#add_custom_target(zmq COMMAND make thirdparty/libzmq/build)
-add_library(libzmqxx STATIC IMPORTED)
-set_target_properties(libzmqxx PROPERTIES LINKER_LANGUAGE CXX)
-set_property(TARGET libzmqxx PROPERTY IMPORTED_LOCATION build/thirdparty/libzmq/lib/libzmq.a)
+##add_custom_target(zmq COMMAND make thirdparty/libzmq/build)
+#add_library(libzmqxx STATIC IMPORTED)
+#set_target_properties(libzmqxx PROPERTIES LINKER_LANGUAGE CXX)
+#set_property(TARGET libzmqxx PROPERTY IMPORTED_LOCATION build/thirdparty/libzmq/lib/libzmq.a)
 
 # cppzmq
-include_directories(thirdparty/cppzmq)
+#include_directories(thirdparty/cppzmq)
 #add_subdirectory(thirdparty/cppzmq)
 
 #
@@ -92,4 +97,5 @@ include_directories(thirdparty/cppzmq)
 
 # barbarossa
 add_executable(barbarossa ${SOURCES})
-target_link_libraries(barbarossa Threads::Threads nlohmann_json::nlohmann_json libzmq ssl crypto) #libzmqxx
+# spdlog_enable_warnings(barbarossa)
+target_link_libraries(barbarossa PRIVATE Threads::Threads nlohmann_json::nlohmann_json ssl crypto)

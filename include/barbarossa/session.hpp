@@ -23,12 +23,13 @@
 
 namespace barbarossa::controlchannel {
 
-const std::chrono::seconds kSessionDefaultRequestTimeout{16};
+const std::chrono::seconds kSessionDefaultRequestTimeout(16);
 
 class Session : public TransportHandler,
                 public std::enable_shared_from_this<Session> {
  public:
-  explicit Session(asio::io_service& io_service);
+  // It's best practise to pass the asio::io_service as non-const reference.
+  explicit Session(asio::io_service& io_service);  // NOLINT
 
   void Start();
   // Join sends the hello message and waits for response
@@ -45,6 +46,7 @@ class Session : public TransportHandler,
 
   void SendMessage(Message&& message, bool session_established = true);
   void ProcessWelcomeMessage(Message&& message);
+  void HearbeatController();
 
   asio::io_service& io_service_;
   SessionState state_;
@@ -56,6 +58,11 @@ class Session : public TransportHandler,
   std::shared_ptr<Transport> transport_;
   std::promise<uint32_t> joined_;
   std::promise<void> started_;
+
+  std::condition_variable stop_signal_;
+  std::mutex stop_signal_mutex_;
+
+  std::thread hearbeat_thread_;
 };
 
 }  // namespace barbarossa::controlchannel

@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include "spdlog/fmt/ostr.h"
+
 namespace barbarossa::controlchannel {
 
 enum class MessageType : int {
@@ -27,9 +29,34 @@ enum class MessageType : int {
   kPublished = 21,
 };
 
-std::string ToString(MessageType type);
+// Custom types needs the operator implementation for proper logging (spdlog).
+template <typename OSTREAM>
+OSTREAM& operator<<(OSTREAM& os, const MessageType& state) {
+  switch (state) {
+    case MessageType::kHello:
+      return os << "HELLO";
+    case MessageType::kWelcome:
+      return os << "WELCOME";
+    case MessageType::kAbort:
+      return os << "ABORT";
+    case MessageType::kPing:
+      return os << "PING";
+    case MessageType::kPong:
+      return os << "PONG";
+    case MessageType::kError:
+      return os << "ERROR";
+    case MessageType::kCall:
+      return os << "CALL";
+    case MessageType::kResult:
+      return os << "RESULT";
+    case MessageType::kPublish:
+      return os << "PUBLISH";
+    case MessageType::kPublished:
+      return os << "PUBLISHED";
+  }
+  return os << "UNKNOWN";
+}
 
 }  // namespace barbarossa::controlchannel
 
-#include "barbarossa/message_type.ipp"
 #endif  // BARBAROSSA_MESSAGE_TYPE_HPP_

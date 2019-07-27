@@ -72,9 +72,9 @@ inline void Session::Start() {
 inline uint32_t Session::Join(const std::string& realm) {
   spdlog::info("session join started");
 
-  Message hello_msg(2);
-  hello_msg.SetField<MessageType>(0, MessageType::kHello);
-  hello_msg.SetField<std::string>(1, realm);
+  Message hello_message(2);
+  hello_message.SetField<MessageType>(0, MessageType::kHello);
+  hello_message.SetField<std::string>(1, realm);
 
   // Set the current state to ESTABLISHING
   EnsureState(SessionState::kEstablishing);
@@ -95,9 +95,10 @@ inline uint32_t Session::Join(const std::string& realm) {
     }
 
     try {
-      transport_->SendMessage(std::move(hello_msg));
+      // Note that in this case an established session isn't required.
+      SendMessage(std::move(hello_message), false);
     } catch (std::exception& e) {
-      joined_.set_exception(std::make_exception_ptr(std::copy_exception(e)));
+      joined_.set_exception(std::make_exception_ptr(e));
     }
   });
 
@@ -125,7 +126,7 @@ inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
   transport_ = transport;
 }
 
-inline void Session::OnDetach(const std::string& reason) {
+inline void Session::OnDetach(const std::string& /*reason*/) {
   if (!transport_) {
     throw std::logic_error(ErrorMessages::kSessionTransportAlreadyDetached);
   }
@@ -179,8 +180,7 @@ inline void Session::OnMessage(Message&& message) {
 
 inline void Session::EnsureState(SessionState state) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  spdlog::debug("session change state from {} to {}", ToString(state_),
-                ToString(state));
+  spdlog::debug("session change state from {} to {}", state_, state);
   state_ = state;
 }
 
@@ -215,8 +215,50 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
   // Set the current state to ESTABLISHED
   EnsureState(SessionState::kEstablished);
 
+  // Start heartbeat
+  hearbeat_thread_ = std::thread(&Session::HearbeatController, this);
+
   session_id_ = message.Field<uint32_t>(1);
   joined_.set_value(session_id_);
+}
+
+inline void Session::HearbeatController() {
+  spdlog::debug("hearbeat: controller thread start");
+
+  std::condition_variable ping_or_die;
+  std::mutex ping_or_die_mutex;
+
+  auto heartbeat_future = std::async([&]() {
+    while (true) {
+      std::unique_lock<std::mutex> lock(ping_or_die_mutex);
+      spdlog::debug("heartbeat: wait until sending ping or die.");
+
+      // We send every given seconds a ping or we stop the hearbeat
+      if (ping_or_die.wait_for(lock, std::chrono::seconds(20)) ==
+          std::cv_status::no_timeout) {
+        spdlog::info(
+            "heartbeat: received the die condition and terminate now.");
+        break;  // Exit the loop because ping_or_die condition is set
+      }
+
+      Message ping_message(2);
+      ping_message.SetField<MessageType>(0, MessageType::kPing);
+      ping_message.SetField<json::object_t>(1, json::object());
+      try {
+        SendMessage(std::move(ping_message));
+      } catch (const NetworkError& e) {
+        spdlog::debug("heartbeat: we have network error!");
+        break;
+      }
+    }
+  });
+
+  // Wait until we receive a stop signal
+  std::unique_lock<std::mutex> lock(stop_signal_mutex_);
+  stop_signal_.wait(lock);
+
+  // Tell our async routine above to die
+  ping_or_die.notify_one();
 }
 
 }  // namespace barbarossa::controlchannel
