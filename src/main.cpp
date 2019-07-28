@@ -7,8 +7,6 @@
 #include <iostream>
 #include <string>
 
-#define ASIO_STANDALONE
-#include "asio.hpp"
 #include "barbarossa/session.hpp"
 #include "barbarossa/transport.hpp"
 #include "barbarossa/transport_handler.hpp"

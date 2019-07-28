@@ -57,7 +57,6 @@ class WebSocketTransport
   std::string uri_;
   bool open_;
   bool done_;
-  bool closed_;
 
   websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread_;
   websocketpp::lib::mutex lock_;
