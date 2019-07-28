@@ -8,6 +8,7 @@
 #include <string>
 
 #define ASIO_STANDALONE
+#include "asio.hpp"
 #include "barbarossa/session.hpp"
 #include "barbarossa/transport.hpp"
 #include "barbarossa/transport_handler.hpp"
@@ -31,11 +32,11 @@ int main(int argc, char* argv[]) {
   typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context>
       context_ptr;
 
-  asio::io_service io;
+  asio::io_context io_context(1);
 
   // Create a websocketpp client and wire it with our asio I/O service.
   client_t client;
-  client.init_asio(&io);
+  client.init_asio(&io_context);
   spdlog::info("endpoint created");
 
   // Our websocket runs over TLS and therefore it's required to setup a TLS init
@@ -65,7 +66,15 @@ int main(int argc, char* argv[]) {
   spdlog::info("transport ready");
 
   // Create our control channel session layer.
-  auto session = std::make_shared<controlchannel::Session>(io);
+  auto session = std::make_shared<controlchannel::Session>(io_context);
+
+  // Wire signal handler
+  asio::signal_set signals(io_context, SIGINT, SIGTERM);
+  signals.async_wait([&](auto, auto) {
+    spdlog::debug("signal received");
+    session->Leave();
+    io_context.stop();
+  });
 
   // Wire transport and session layer together and connect to the server.
   transport->Attach(
@@ -79,7 +88,7 @@ int main(int argc, char* argv[]) {
   session->Join(argv[2]);
   spdlog::info("session joined");
 
-  io.run();
+  io_context.run();
 
   return 0;
 }

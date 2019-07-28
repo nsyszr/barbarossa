@@ -31,20 +31,43 @@
 
 namespace barbarossa::controlchannel {
 
-inline Session::Session(asio::io_service& io_service)
-    : io_service_(io_service),
+inline Session::Session(asio::io_context& io_context)
+    : io_context_(io_context),
       state_(SessionState::kClosed),
       running_(false),
       session_id_(0),
       request_timeout_(kSessionDefaultRequestTimeout) {}
+
+inline Session::~Session() {
+  if (hearbeat_thread_.joinable()) {
+    hearbeat_thread_.join();
+  }
+}
 
 inline void Session::Start() {
   spdlog::info("session start called");
 
   // We use dispatch to synchronously send the message in the current thread.
   // After execution we can expect that the message is on the wire.
-  auto weak_self = std::weak_ptr<Session>(shared_from_this());
-  io_service_.dispatch([&]() {
+  auto self(shared_from_this());
+  asio::dispatch(io_context_, [this, self]() {
+    if (running_) {
+      started_.set_exception(std::make_exception_ptr(
+          std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
+      return;
+    }
+
+    if (!transport_) {
+      started_.set_exception(std::make_exception_ptr(NoTransportError()));
+      return;
+    }
+
+    running_ = true;
+    started_.set_value();
+  });
+
+  /*auto weak_self = std::weak_ptr<Session>(shared_from_this());
+  io_context_.dispatch([&]() {
     auto shared_self = weak_self.lock();
     if (!shared_self) {
       return;
@@ -63,7 +86,7 @@ inline void Session::Start() {
 
     running_ = true;
     started_.set_value();
-  });
+  });*/
 
   auto started_future = started_.get_future();
   return started_future.get();
@@ -81,8 +104,24 @@ inline uint32_t Session::Join(const std::string& realm) {
 
   // We use dispatch to synchronously send the message in the current thread.
   // After execution we can expect that the message is on the wire.
-  auto weak_self = std::weak_ptr<Session>(shared_from_this());
-  io_service_.dispatch([&]() {
+  auto self(shared_from_this());
+  asio::dispatch(io_context_, [this, self, &hello_message]() {
+    if (session_id_) {
+      joined_.set_exception(std::make_exception_ptr(
+          std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
+      return;
+    }
+
+    try {
+      // Note that in this case an established session isn't required.
+      SendMessage(std::move(hello_message), false);
+    } catch (std::exception& e) {
+      joined_.set_exception(std::make_exception_ptr(e));
+    }
+  });
+
+  /*auto weak_self = std::weak_ptr<Session>(shared_from_this());
+  io_context_.dispatch([&]() {
     auto shared_self = weak_self.lock();
     if (!shared_self) {
       return;
@@ -100,7 +139,7 @@ inline uint32_t Session::Join(const std::string& realm) {
     } catch (std::exception& e) {
       joined_.set_exception(std::make_exception_ptr(e));
     }
-  });
+  });*/
 
   /*
   // Wait for the response or handle timeout
@@ -113,6 +152,8 @@ inline uint32_t Session::Join(const std::string& realm) {
   auto joined_future = joined_.get_future();
   return joined_future.get();
 }
+
+inline void Session::Leave() { stop_signal_.notify_all(); }
 
 inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
   if (transport_) {
@@ -155,7 +196,7 @@ inline void Session::OnMessage(Message&& message) {
     case MessageType::kPing:
       throw ProtocolError("client received PING message");
     case MessageType::kPong:
-      // ProcessPongMessage
+      ProcessPongMessage(std::move(message));
       break;
     case MessageType::kError:
       // ProcessErrorMessage
@@ -208,6 +249,7 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
     // Received WELCOME message after session was established
     // SendMessage(abort_msg); reason: ERR_PROTOCOL_VIOLATION
 
+    // TODO(DGL) the protocol error should be set on the promise!
     throw ProtocolError(
         "client received WELCOME message but session already established");
   }
@@ -222,10 +264,60 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
   joined_.set_value(session_id_);
 }
 
+inline void Session::ProcessPongMessage(Message&& message) {
+  spdlog::debug("handle pong message");
+  hearbeat_alive_.set_value();
+}
+
 inline void Session::HearbeatController() {
   spdlog::debug("hearbeat: controller thread start");
 
-  std::promise<void> heartbeat;
+  while (true) {
+    std::unique_lock<std::mutex> lock(stop_signal_mutex_);
+    spdlog::debug("heartbeat: wait until sending ping or die.");
+
+    // We send every given seconds a ping or we stop the hearbeat
+    if (stop_signal_.wait_for(lock, std::chrono::seconds(16)) ==
+        std::cv_status::no_timeout) {
+      spdlog::info("heartbeat: received the die condition and terminate now.");
+
+      // heartbeat.set_value();
+      break;  // Exit the loop because stop_signal_ is set
+    }
+
+    Message ping_message(2);
+    ping_message.SetField<MessageType>(0, MessageType::kPing);
+    ping_message.SetField<json::object_t>(1, json::object());
+
+    // Dispatch the ping message
+    auto self(shared_from_this());
+    asio::dispatch(io_context_, [this, self, &ping_message]() {
+      try {
+        // Note that in this case an established session isn't required.
+        SendMessage(std::move(ping_message), true);
+      } catch (std::exception& e) {
+        hearbeat_alive_.set_exception(std::make_exception_ptr(e));
+      }
+    });
+
+    // Wait for our pong message
+    auto f = hearbeat_alive_.get_future();
+    if (f.wait_for(std::chrono::seconds(4)) == std::future_status::timeout) {
+      spdlog::error("heartbeat timeout");
+      break;
+    }
+
+    // If everything is fine get doesn't block, but can raise an exception
+    // TODO(DGL) handle the exception because we're running inside a thread!
+    f.get();
+
+    // Reset the promise for the next pong
+    hearbeat_alive_ = std::promise<void>();
+  }
+
+  spdlog::debug("heartbeat terminated");
+
+  /*std::promise<void> heartbeat;
   auto hearbeat_future = heartbeat.get_future();
 
   std::async([&]() {
@@ -262,7 +354,7 @@ inline void Session::HearbeatController() {
     hearbeat_future.get();
   } catch (const NetworkError& e) {
     spdlog::debug("heartbeat controller: we have network error!");
-  }
+  }*/
 }
 
 }  // namespace barbarossa::controlchannel

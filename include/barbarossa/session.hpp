@@ -29,11 +29,13 @@ class Session : public TransportHandler,
                 public std::enable_shared_from_this<Session> {
  public:
   // It's best practise to pass the asio::io_service as non-const reference.
-  explicit Session(asio::io_service& io_service);  // NOLINT
+  explicit Session(asio::io_context& io_context);  // NOLINT
+  ~Session();
 
   void Start();
   // Join sends the hello message and waits for response
   uint32_t Join(const std::string& realm);
+  void Leave();
 
  private:
   // Implement the transport handler interface
@@ -46,9 +48,10 @@ class Session : public TransportHandler,
 
   void SendMessage(Message&& message, bool session_established = true);
   void ProcessWelcomeMessage(Message&& message);
+  void ProcessPongMessage(Message&& message);
   void HearbeatController();
 
-  asio::io_service& io_service_;
+  asio::io_context& io_context_;
   SessionState state_;
   bool running_;
   uint32_t session_id_;
@@ -63,6 +66,7 @@ class Session : public TransportHandler,
   std::mutex stop_signal_mutex_;
 
   std::thread hearbeat_thread_;
+  std::promise<void> hearbeat_alive_;
 };
 
 }  // namespace barbarossa::controlchannel
