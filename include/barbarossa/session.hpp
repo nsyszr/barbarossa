@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <future>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -20,8 +21,11 @@
 #include "barbarossa/session_state.hpp"
 #include "barbarossa/transport.hpp"
 #include "barbarossa/transport_handler.hpp"
+#include "nlohmann/json.hpp"
 
 namespace barbarossa::controlchannel {
+
+using json = nlohmann::json;
 
 const std::chrono::seconds kSessionDefaultRequestTimeout(16);
 
@@ -36,6 +40,8 @@ class Session : public TransportHandler,
   // Join sends the hello message and waits for response
   uint32_t Join(const std::string& realm);
   void Leave();
+  void RegisterOperation(const std::string& operation,
+                         std::function<json(const json&)> fn);
 
  private:
   // Implement the transport handler interface
@@ -47,26 +53,29 @@ class Session : public TransportHandler,
   SessionState CurrentState();
 
   void SendMessage(Message&& message, bool session_established = true);
+  
   void ProcessWelcomeMessage(Message&& message);
   void ProcessPongMessage(Message&& message);
+  void ProcessCallMessage(Message&& message);
+
   void HearbeatController();
 
   asio::io_context& io_context_;
   SessionState state_;
-  bool running_;
   uint32_t session_id_;
   std::chrono::seconds request_timeout_;
 
   std::mutex state_mutex_;
   std::shared_ptr<Transport> transport_;
   std::promise<uint32_t> joined_;
-  std::promise<void> started_;
 
   std::condition_variable stop_signal_;
   std::mutex stop_signal_mutex_;
 
   std::thread hearbeat_thread_;
   std::promise<void> hearbeat_alive_;
+
+  std::map<std::string, std::function<json(const json&)>> operations_;
 };
 
 }  // namespace barbarossa::controlchannel

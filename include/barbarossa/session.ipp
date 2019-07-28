@@ -34,7 +34,6 @@ namespace barbarossa::controlchannel {
 inline Session::Session(asio::io_context& io_context)
     : io_context_(io_context),
       state_(SessionState::kClosed),
-      running_(false),
       session_id_(0),
       request_timeout_(kSessionDefaultRequestTimeout) {}
 
@@ -43,54 +42,6 @@ inline Session::~Session() {
     spdlog::debug("wait for heartbeat thread to finish");
     hearbeat_thread_.join();
   }
-}
-
-inline void Session::Start() {
-  spdlog::info("session start called");
-
-  // We use dispatch to synchronously send the message in the current thread.
-  // After execution we can expect that the message is on the wire.
-  auto self(shared_from_this());
-  asio::dispatch(io_context_, [this, self]() {
-    if (running_) {
-      started_.set_exception(std::make_exception_ptr(
-          std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
-      return;
-    }
-
-    if (!transport_) {
-      started_.set_exception(std::make_exception_ptr(NoTransportError()));
-      return;
-    }
-
-    running_ = true;
-    started_.set_value();
-  });
-
-  /*auto weak_self = std::weak_ptr<Session>(shared_from_this());
-  io_context_.dispatch([&]() {
-    auto shared_self = weak_self.lock();
-    if (!shared_self) {
-      return;
-    }
-
-    if (running_) {
-      started_.set_exception(std::make_exception_ptr(
-          std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
-      return;
-    }
-
-    if (!transport_) {
-      started_.set_exception(std::make_exception_ptr(NoTransportError()));
-      return;
-    }
-
-    running_ = true;
-    started_.set_value();
-  });*/
-
-  auto started_future = started_.get_future();
-  return started_future.get();
 }
 
 inline uint32_t Session::Join(const std::string& realm) {
@@ -146,6 +97,11 @@ inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
   transport_ = transport;
 }
 
+inline void Session::RegisterOperation(const std::string& operation,
+                                       std::function<json(const json&)> fn) {
+  operations_[operation] = fn;
+}
+
 inline void Session::OnDetach(const std::string& /*reason*/) {
   if (!transport_) {
     throw std::logic_error(ErrorMessages::kSessionTransportAlreadyDetached);
@@ -181,9 +137,7 @@ inline void Session::OnMessage(Message&& message) {
       // ProcessErrorMessage
       break;
     case MessageType::kCall:
-      // ProcessCallMessage
-      // if operation is not registered return ERROR message with reason:
-      // ERR_NO_SUCH_OPERATION
+      ProcessCallMessage(std::move(message));
       break;
     case MessageType::kResult:
       throw ProtocolError("client received unsupported RESULT message");
@@ -246,6 +200,42 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
 inline void Session::ProcessPongMessage(Message&& message) {
   spdlog::debug("handle pong message");
   hearbeat_alive_.set_value();
+}
+
+inline void Session::ProcessCallMessage(Message&& message) {
+  // TODO(DGL) Add message checking like length, et.c
+
+  int32_t request_id = message.Field<int32_t>(1);
+  auto operation = message.Field<std::string>(2);
+  auto arguments = message.Field<json>(3);
+
+  spdlog::debug("process call message: {}, {}, {}", request_id, operation,
+                arguments);
+
+  auto it = operations_.find(operation);
+  if (it != operations_.end()) {
+    auto result = it->second(arguments);
+
+    spdlog::debug("call message processed: {}", result.dump());
+
+    Message result_message(3);
+    result_message.SetField<MessageType>(0, MessageType::kResult);
+    result_message.SetField<int32_t>(1, request_id);
+    result_message.SetField<json>(2, result);
+
+    SendMessage(std::move(result_message));
+  } else {
+    spdlog::debug("call message failed");
+
+    Message error_message(5);
+    error_message.SetField<MessageType>(0, MessageType::kError);
+    error_message.SetField<MessageType>(1, MessageType::kCall);
+    error_message.SetField<int32_t>(2, request_id);
+    error_message.SetField<std::string>(3, "ERR_NO_SUCH_OPERATION");
+    error_message.SetField<json>(4, json::object());
+
+    SendMessage(std::move(error_message));
+  }
 }
 
 inline void Session::HearbeatController() {

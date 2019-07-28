@@ -13,8 +13,11 @@
 #include "barbarossa/transport.hpp"
 #include "barbarossa/transport_handler.hpp"
 #include "barbarossa/websocket_transport.hpp"
+#include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 #include "websocketpp/config/asio_client.hpp"
+
+using json = nlohmann::json;
 
 int main(int argc, char* argv[]) {
   // In implementation files the using namespace is allowed.
@@ -37,12 +40,12 @@ int main(int argc, char* argv[]) {
   // Create a websocketpp client and wire it with our asio I/O service.
   client_t client;
   client.init_asio(&io_context);
-  spdlog::info("endpoint created");
+  spdlog::debug("endpoint created");
 
   // Our websocket runs over TLS and therefore it's required to setup a TLS init
   // handler for the websocketpp implementation.
   client.set_tls_init_handler([](websocketpp::connection_hdl) {
-    spdlog::debug("endpoint tls init handler");
+    spdlog::debug("endpoint tls init handler called");
 
     context_ptr ctx =
         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
@@ -57,13 +60,13 @@ int main(int argc, char* argv[]) {
     }
     return ctx;
   });
-  spdlog::info("endpoint ready");
+  spdlog::debug("endpoint ready");
 
   // Create our control channel transport layer.
   auto transport = std::make_shared<
       controlchannel::WebSocketTransport<websocketpp::config::asio_tls_client>>(
       client, argv[1]);
-  spdlog::info("transport ready");
+  spdlog::debug("transport ready");
 
   // Create our control channel session layer.
   auto session = std::make_shared<controlchannel::Session>(io_context);
@@ -80,13 +83,25 @@ int main(int argc, char* argv[]) {
   transport->Attach(
       std::static_pointer_cast<controlchannel::TransportHandler>(session));
   transport->Connect();
-  spdlog::info("transport connected");
+  spdlog::debug("transport connected");
 
-  session->Start();
-  spdlog::info("session started");
+  // Register operations
+  session->RegisterOperation("say_hello", [](const json& arguments) {
+    auto result = json::object();
 
+    if (arguments.find("name") != arguments.end()) {
+      auto name = arguments["name"].get<std::string>();
+      result["say_hello"] = "Hello " + name + "!";
+    } else {
+      result["say_hello"] = "Hello World!";
+    }
+
+    return result;
+  });
+
+  // Start the session by joining it
   session->Join(argv[2]);
-  spdlog::info("session joined");
+  spdlog::debug("session joined");
 
   io_context.run();
 
