@@ -41,7 +41,7 @@ class Session : public TransportHandler,
   uint32_t Join(const std::string& realm);
   void Leave();
   void RegisterOperation(const std::string& operation,
-                         std::function<json(const json&)> fn);
+                         std::function<json(json&&)> fn);
 
  private:
   // Implement the transport handler interface
@@ -53,7 +53,7 @@ class Session : public TransportHandler,
   SessionState CurrentState();
 
   void SendMessage(Message&& message, bool session_established = true);
-  
+
   void ProcessWelcomeMessage(Message&& message);
   void ProcessPongMessage(Message&& message);
   void ProcessCallMessage(Message&& message);
@@ -75,7 +75,7 @@ class Session : public TransportHandler,
   std::thread hearbeat_thread_;
   std::promise<void> hearbeat_alive_;
 
-  std::map<std::string, std::function<json(const json&)>> operations_;
+  std::map<std::string, std::function<json(json&&)>> operations_;
 };
 
 }  // namespace barbarossa::controlchannel

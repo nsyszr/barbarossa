@@ -98,7 +98,7 @@ inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
 }
 
 inline void Session::RegisterOperation(const std::string& operation,
-                                       std::function<json(const json&)> fn) {
+                                       std::function<json(json&&)> fn) {
   operations_[operation] = fn;
 }
 
@@ -214,7 +214,7 @@ inline void Session::ProcessCallMessage(Message&& message) {
 
   auto it = operations_.find(operation);
   if (it != operations_.end()) {
-    auto result = it->second(arguments);
+    auto result = it->second(std::move(arguments));
 
     spdlog::debug("call message processed: {}", result.dump());
 

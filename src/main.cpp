@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
   spdlog::debug("transport connected");
 
   // Register operations
-  session->RegisterOperation("say_hello", [](const json& arguments) {
+  session->RegisterOperation("say_hello", [](json&& arguments) {
     auto result = json::object();
 
     if (arguments.find("name") != arguments.end()) {
