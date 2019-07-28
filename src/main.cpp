@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
   asio::signal_set signals(io_context, SIGINT, SIGTERM);
   signals.async_wait([&](auto, auto) {
     spdlog::debug("signal received");
-    session->Leave();
+    session->Leave();  // TODO(DGL) Add leave message?
     io_context.stop();
   });
 

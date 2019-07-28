@@ -72,6 +72,11 @@ class NoTransportError : public NetworkError {
   NoTransportError() : NetworkError(ErrorMessages::kSessionNotAttached) {}
 };
 
+class TimeoutError : public NetworkError {
+ public:
+  TimeoutError() : NetworkError("timeout") {}
+};
+
 }  // namespace barbarossa::controlchannel
 
 #endif  // BARBAROSSA_ERRORS_HPP_

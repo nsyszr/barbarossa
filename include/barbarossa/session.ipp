@@ -40,6 +40,7 @@ inline Session::Session(asio::io_context& io_context)
 
 inline Session::~Session() {
   if (hearbeat_thread_.joinable()) {
+    spdlog::debug("wait for heartbeat thread to finish");
     hearbeat_thread_.join();
   }
 }
@@ -120,36 +121,14 @@ inline uint32_t Session::Join(const std::string& realm) {
     }
   });
 
-  /*auto weak_self = std::weak_ptr<Session>(shared_from_this());
-  io_context_.dispatch([&]() {
-    auto shared_self = weak_self.lock();
-    if (!shared_self) {
-      return;
-    }
-
-    if (session_id_) {
-      joined_.set_exception(std::make_exception_ptr(
-          std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
-      return;
-    }
-
-    try {
-      // Note that in this case an established session isn't required.
-      SendMessage(std::move(hello_message), false);
-    } catch (std::exception& e) {
-      joined_.set_exception(std::make_exception_ptr(e));
-    }
-  });*/
-
-  /*
-  // Wait for the response or handle timeout
-  if (joined_future.wait_for(request_timeout_) ==
-      std::future_status::timeout) {
-    FailAndThrowProtocolError("timeout");
-  }
-  */
-
   auto joined_future = joined_.get_future();
+
+  // Wait for the future until timeout
+  if (joined_future.wait_for(std::chrono::seconds(16)) ==
+      std::future_status::timeout) {
+    throw TimeoutError();
+  }
+
   return joined_future.get();
 }
 
@@ -307,7 +286,7 @@ inline void Session::HearbeatController() {
       break;
     }
 
-    // If everything is fine get doesn't block, but can raise an exception
+    // If everything is fine get() doesn't block, but can raise an exception
     // TODO(DGL) handle the exception because we're running inside a thread!
     f.get();
 
@@ -316,45 +295,6 @@ inline void Session::HearbeatController() {
   }
 
   spdlog::debug("heartbeat terminated");
-
-  /*std::promise<void> heartbeat;
-  auto hearbeat_future = heartbeat.get_future();
-
-  std::async([&]() {
-    while (true) {
-      std::unique_lock<std::mutex> lock(stop_signal_mutex_);
-      spdlog::debug("heartbeat: wait until sending ping or die.");
-
-      // We send every given seconds a ping or we stop the hearbeat
-      if (stop_signal_.wait_for(lock, std::chrono::seconds(20)) ==
-          std::cv_status::no_timeout) {
-        spdlog::info(
-            "heartbeat: received the die condition and terminate now.");
-
-        heartbeat.set_value();
-        break;  // Exit the loop because stop_signal_ is set
-      }
-
-      Message ping_message(2);
-      ping_message.SetField<MessageType>(0, MessageType::kPing);
-      ping_message.SetField<json::object_t>(1, json::object());
-
-      try {
-        SendMessage(std::move(ping_message));
-      } catch (const NetworkError& e) {
-        spdlog::debug("heartbeat: we have network error!");
-
-        heartbeat.set_exception(std::make_exception_ptr(e));
-        break;  // Exit the loop because we caught an exception
-      }
-    }
-  });
-
-  try {
-    hearbeat_future.get();
-  } catch (const NetworkError& e) {
-    spdlog::debug("heartbeat controller: we have network error!");
-  }*/
 }
 
 }  // namespace barbarossa::controlchannel
