@@ -38,13 +38,14 @@ int main(int argc, char* argv[]) {
   // Create a websocketpp client and wire it with our asio I/O service.
   client_t client;
   client.init_asio(&io_context);
-  spdlog::debug("endpoint created");
+
+  // Start our ASIO io_context in background;
+  std::thread t([&io_context]() { io_context.run(); });
 
   // Our websocket runs over TLS and therefore it's required to setup a TLS init
   // handler for the websocketpp implementation.
   client.set_tls_init_handler([](websocketpp::connection_hdl) {
     spdlog::debug("endpoint tls init handler called");
-
     context_ptr ctx =
         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
 
@@ -58,30 +59,14 @@ int main(int argc, char* argv[]) {
     }
     return ctx;
   });
-  spdlog::debug("endpoint ready");
 
   // Create our control channel transport layer.
   auto transport = std::make_shared<
       controlchannel::WebSocketTransport<websocketpp::config::asio_tls_client>>(
       client, argv[1]);
-  spdlog::debug("transport ready");
 
   // Create our control channel session layer.
   auto session = std::make_shared<controlchannel::Session>(io_context);
-
-  // Wire signal handler
-  asio::signal_set signals(io_context, SIGINT, SIGTERM);
-  signals.async_wait([&](auto, auto) {
-    spdlog::debug("signal received");
-    session->Leave();  // TODO(DGL) Add leave message?
-    io_context.stop();
-  });
-
-  // Wire transport and session layer together and connect to the server.
-  transport->Attach(
-      std::static_pointer_cast<controlchannel::TransportHandler>(session));
-  transport->Connect();
-  spdlog::debug("transport connected");
 
   // Register operations
   session->RegisterOperation("say_hello", [](json&& arguments) {
@@ -97,11 +82,33 @@ int main(int argc, char* argv[]) {
     return result;
   });
 
-  // Start the session by joining it
-  session->Join(argv[2]);
-  spdlog::debug("session joined");
+  // Wire signal handler
+  asio::signal_set signals(io_context, SIGINT, SIGTERM);
+  signals.async_wait([&](auto, auto) {
+    spdlog::debug("signal received");
+    session->Leave();  // TODO(DGL) Add leave message?
+    io_context.stop();
+  });
 
-  io_context.run();
+  try {
+    // Wire transport and session layer together and connect to the server.
+    transport->Attach(
+        std::static_pointer_cast<controlchannel::TransportHandler>(session));
+    transport->Connect();
+    spdlog::debug("transport connected");
 
+    // Start the session by joining it
+    session->Join(argv[2]);
+    spdlog::debug("session joined");
+
+    // Blocking
+    session->Listen();
+  } catch (const controlchannel::TimeoutError& e) {
+    spdlog::error("controlchannel timeout");
+    // TODO(DGL) Restart?
+    io_context.stop();
+  }
+
+  t.join();
   return 0;
 }

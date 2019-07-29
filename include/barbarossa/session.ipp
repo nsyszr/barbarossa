@@ -24,7 +24,6 @@
 // - Network / Transport layer issues
 //   - Throw NetworkError
 
-
 #include "barbarossa/errors.hpp"
 #include "barbarossa/message_type.hpp"
 #include "spdlog/spdlog.h"
@@ -83,7 +82,10 @@ inline uint32_t Session::Join(const std::string& realm) {
   return joined_future.get();
 }
 
-inline void Session::Leave() { stop_signal_.notify_all(); }
+inline void Session::Leave() {
+  // stop_signal_.notify_all();
+  leaved_.set_value(true);
+}
 
 inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
   if (transport_) {
@@ -95,6 +97,11 @@ inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
   // assert(running)
 
   transport_ = transport;
+}
+
+inline void Session::Listen() {
+  auto leaved_future = leaved_.get_future();
+  leaved_future.get();
 }
 
 inline void Session::RegisterOperation(const std::string& operation,
@@ -114,7 +121,10 @@ inline void Session::OnMessage(Message&& message) {
   spdlog::debug("session received message");
 
   if (message.Size() < 1) {
-    throw ProtocolError(ErrorMessages::kInvalidMessageStructure);
+    // throw ProtocolError(ErrorMessages::kInvalidMessageStructure);
+    leaved_.set_exception(std::make_exception_ptr(
+        ProtocolError(ErrorMessages::kInvalidMessageStructure)));
+    return;
   }
 
   auto message_type = static_cast<MessageType>(message.Field<int>(0));
@@ -199,7 +209,7 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
 
 inline void Session::ProcessPongMessage(Message&& message) {
   spdlog::debug("handle pong message");
-  hearbeat_alive_.set_value();
+  hearbeat_alive_.set_value(true);
 }
 
 inline void Session::ProcessCallMessage(Message&& message) {
@@ -241,12 +251,13 @@ inline void Session::ProcessCallMessage(Message&& message) {
 inline void Session::HearbeatController() {
   spdlog::debug("hearbeat: controller thread start");
 
+  auto leaved_future = leaved_.get_future();
   while (true) {
     std::unique_lock<std::mutex> lock(stop_signal_mutex_);
     spdlog::debug("heartbeat: wait until sending ping or die.");
 
     // We send every given seconds a ping or we stop the hearbeat
-    if (stop_signal_.wait_for(lock, std::chrono::seconds(16)) ==
+    if (stop_signal_.wait_for(lock, std::chrono::seconds(20)) ==
         std::cv_status::no_timeout) {
       spdlog::info("heartbeat: received the die condition and terminate now.");
 
@@ -273,15 +284,24 @@ inline void Session::HearbeatController() {
     auto f = hearbeat_alive_.get_future();
     if (f.wait_for(std::chrono::seconds(4)) == std::future_status::timeout) {
       spdlog::error("heartbeat timeout");
-      break;
+      // Set our heartbeat alive promise to false! This tells our routine that
+      // a timeout happend!
+      hearbeat_alive_.set_value(false);
     }
 
     // If everything is fine get() doesn't block, but can raise an exception
-    // TODO(DGL) handle the exception because we're running inside a thread!
-    f.get();
+    try {
+      // If our future is false, then it's set above because of timeout!
+      if (!f.get()) {
+        leaved_.set_exception(std::make_exception_ptr(TimeoutError()));
+        break;
+      }
+    } catch (std::exception& e) {
+      leaved_.set_exception(std::make_exception_ptr(e));
+    }
 
     // Reset the promise for the next pong
-    hearbeat_alive_ = std::promise<void>();
+    hearbeat_alive_ = std::promise<bool>();
   }
 
   spdlog::debug("heartbeat terminated");

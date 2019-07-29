@@ -20,8 +20,8 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra") 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Os -msse4 -flto -ffunction-sections -fdata-sections")
-link_libraries("-flto -Wl,--gc-sections")
+#set(CMAKE_CXX_FLAGS_RELEASE "-Os -msse4 -flto -ffunction-sections -fdata-sections")
+#link_libraries("-flto -Wl,--gc-sections")
 
 # set(CMAKE_BUILD_TYPE Release)
 # set(CMAKE_CXX_FLAGS "-msse4 -O2 -Wall -Wextra -flto -ffunction-sections -fdata-sections")

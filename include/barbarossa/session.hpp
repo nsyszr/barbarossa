@@ -43,6 +43,8 @@ class Session : public TransportHandler,
   void RegisterOperation(const std::string& operation,
                          std::function<json(json&&)> fn);
 
+  void Listen();
+
  private:
   // Implement the transport handler interface
   void OnAttach(const std::shared_ptr<Transport>& transport);
@@ -68,12 +70,13 @@ class Session : public TransportHandler,
   std::mutex state_mutex_;
   std::shared_ptr<Transport> transport_;
   std::promise<uint32_t> joined_;
+  std::promise<bool> leaved_;
 
   std::condition_variable stop_signal_;
   std::mutex stop_signal_mutex_;
 
   std::thread hearbeat_thread_;
-  std::promise<void> hearbeat_alive_;
+  std::promise<bool> hearbeat_alive_;
 
   std::map<std::string, std::function<json(json&&)>> operations_;
 };
