@@ -17,6 +17,7 @@ struct ErrorMessages {
       "transport already connected";
   constexpr static char kTransportAlreadyDisconnected[] =
       "transport already disconnected";
+  constexpr static char kTransportNotConnected[] = "transport not connected";
 
   constexpr static char kTransportHandlerAlreadyAttached[] =
       "transport handler already attached";
@@ -56,6 +57,19 @@ class ProtocolError : public std::runtime_error {
 
   const char* what() const throw() {
     return std::string("protocol error: " + message_).c_str();
+  }
+
+ private:
+  std::string message_;
+};
+
+class AbortError : public std::runtime_error {
+ public:
+  explicit AbortError(const std::string& message)
+      : std::runtime_error(message), message_(message) {}
+
+  const char* what() const throw() {
+    return std::string("network error: " + message_).c_str();
   }
 
  private:

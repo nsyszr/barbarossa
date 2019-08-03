@@ -57,6 +57,7 @@ class Session : public TransportHandler,
   void SendMessage(Message&& message, bool session_established = true);
 
   void ProcessWelcomeMessage(Message&& message);
+  void ProcessAbortMessage(Message&& message);
   void ProcessPongMessage(Message&& message);
   void ProcessCallMessage(Message&& message);
 
@@ -76,7 +77,7 @@ class Session : public TransportHandler,
   std::mutex stop_signal_mutex_;
 
   std::thread hearbeat_thread_;
-  std::promise<bool> hearbeat_alive_;
+  std::promise<bool> pong_received_;
 
   std::map<std::string, std::function<json(json&&)>> operations_;
 };

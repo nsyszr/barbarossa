@@ -24,17 +24,25 @@ inline WebSocketTransport<CONFIG>::WebSocketTransport(client_t& client,
                                                       const std::string& uri)
     : client_(client), uri_(uri), open_(false), done_(false) {
   // Moved all websocketpp initialization code to a seperate method.
+  spdlog::debug("transport: instance is created");
   StartClient();
 }
 
 template <typename CONFIG>
 inline WebSocketTransport<CONFIG>::~WebSocketTransport() {
-  StopClient("disconnect");
+  // If websocket client isn't closed by Disconnect() we received an opcode 8.
+  // The server closed our connection and that's why we're waiting until the
+  // thread is done before we release the instance.
+  if (!done_) {
+    thread_->join();
+  }
+
+  spdlog::debug("transport: instance is destroyed");
 }
 
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::Connect() {
-  spdlog::debug("transport connecting");
+  spdlog::debug("transport: connecting");
   if (open_) {
     throw std::logic_error(ErrorMessages::kTransportAlreadyConnected);
   }
@@ -55,17 +63,21 @@ inline void WebSocketTransport<CONFIG>::Connect() {
   // Wait for connected_ promise
   auto connected_future = connected_.get_future();
 
-  spdlog::debug("transport connected and waiting for websocketpp on open");
+  spdlog::debug(
+      "transport: connect is waiting for websocket client on open callback");
   connected_future.get();  // This future can throw an exception
+  spdlog::debug("transport: connected");
 }
 
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::Disconnect() {
+  spdlog::debug("transport: disconnecting");
   if (!open_) {
     throw std::logic_error(ErrorMessages::kTransportAlreadyDisconnected);
   }
 
   StopClient("disconnect");  // TODO(DGL) This is regular shutdown.
+  spdlog::debug("transport: disconnected");
 }
 
 template <typename CONFIG>
@@ -75,12 +87,11 @@ inline bool WebSocketTransport<CONFIG>::IsConnected() const {
 
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::SendMessage(Message&& message) {
-  // json j = message;
   auto j = json::array();
   for (std::size_t i = 0; i < message.Size(); i++) {
     j.push_back(message.Field(i));
   }
-  spdlog::debug("sending message: {}", j.dump());
+  spdlog::debug("transpport: sending message: {}", j.dump());
 
   websocketpp::lib::error_code ec;
   client_.send(hdl_, j.dump(), websocketpp::frame::opcode::text, ec);
@@ -94,16 +105,19 @@ inline void WebSocketTransport<CONFIG>::SendMessage(Message&& message) {
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::Attach(
     const std::shared_ptr<TransportHandler>& handler) {
+  spdlog::debug("transport: attaching transport handler");
+
   if (handler_) {
     throw std::logic_error(ErrorMessages::kTransportHandlerAlreadyAttached);
   }
 
   handler_ = handler;
-  handler_->OnAttach(GetSharedPtr());
+  handler_->OnAttach(this->shared_from_this());
 }
 
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::Detach() {
+  spdlog::debug("transport: detaching transport handler");
   if (!handler_) {
     throw std::logic_error(ErrorMessages::kTransportHandlerAlreadyDetached);
   }
@@ -122,31 +136,46 @@ inline bool WebSocketTransport<CONFIG>::HasHandler() const {
 // callbacks and starts the thread.
 template <typename CONFIG>
 inline void WebSocketTransport<CONFIG>::StartClient() {
-  client_.clear_access_channels(websocketpp::log::alevel::all);
+  spdlog::debug("transport: websocket client is starting");
+
   client_.set_access_channels(websocketpp::log::alevel::connect);
   client_.set_access_channels(websocketpp::log::alevel::disconnect);
   client_.set_access_channels(websocketpp::log::alevel::app);
+  // client_.clear_access_channels(websocketpp::log::alevel::all);
+
+  using websocketpp::lib::bind;
+  using websocketpp::lib::placeholders::_1;
+  using websocketpp::lib::placeholders::_2;
+  client_.set_open_handler(
+      bind(&WebSocketTransport<CONFIG>::OnClientOpen, this, _1));
+  client_.set_close_handler(
+      bind(&WebSocketTransport<CONFIG>::OnClientClose, this, _1));
+  client_.set_fail_handler(
+      bind(&WebSocketTransport<CONFIG>::OnClientFail, this, _1));
+  client_.set_message_handler(
+      bind(&WebSocketTransport<CONFIG>::OnClientMessage, this, _1, _2));
+
 
   // On websocket is open handler sets a successfull connected promise to tell
   // our Connect method that our connection is established.
-  client_.set_open_handler([&](websocketpp::connection_hdl) {
-    spdlog::debug("transport on open");
+  /*client_.set_open_handler([this](websocketpp::connection_hdl) {
+    spdlog::debug("transport: websocket client on open is called");
     scoped_lock_t guard(lock_);
     open_ = true;
     connected_.set_value();  // Release successfully the Connect() method
-  });
+  });*/
 
   // On websocket is close handler sets our transport state to disconnected.
-  client_.set_close_handler([&](websocketpp::connection_hdl) {
-    spdlog::debug("transport on close");
+  /*client_.set_close_handler([this](websocketpp::connection_hdl) {
+    spdlog::debug("transport: websocket client on close is called");
     scoped_lock_t guard(lock_);
     done_ = true;
-  });
+  });*/
 
   // On websocket is fail handler sets an exception to our connected promise to
   // tell our Connect method that the connection failed.
-  client_.set_fail_handler([&](websocketpp::connection_hdl) {
-    spdlog::debug("transport on fail");
+  /*client_.set_fail_handler([this](websocketpp::connection_hdl) {
+    spdlog::debug("transport: websocket client on fail is called");
     if (!open_) {
       // Release the Connect() method with a failure
       connected_.set_exception(std::make_exception_ptr(
@@ -154,25 +183,76 @@ inline void WebSocketTransport<CONFIG>::StartClient() {
     }
     scoped_lock_t guard(lock_);
     done_ = true;
-  });
+  });*/
 
-  client_.set_message_handler(
-      [&](websocketpp::connection_hdl, message_ptr_t msg) {
+  /*client_.set_message_handler(
+      [this](websocketpp::connection_hdl, message_ptr_t msg) {
+        spdlog::debug("transport: websocket client on message is called");
         if (msg->get_opcode() != websocketpp::frame::opcode::text) {
           spdlog::error("unsupported binary data");
           // TODO(DGL) What should we do now? Raise ProtocolError?
           return;
         }
         RecvMessage(msg->get_payload());
-      });
+      });*/
 
   client_.start_perpetual();
   thread_.reset(new websocketpp::lib::thread(&client_t::run, &client_));
+
+  spdlog::debug("transport: websocket client is started");
 }
 
 template <typename CONFIG>
-void WebSocketTransport<CONFIG>::StopClient(
+inline void WebSocketTransport<CONFIG>::OnClientOpen(
+    websocketpp::connection_hdl) {
+  spdlog::debug("transport: websocket client on open is called");
+  scoped_lock_t guard(lock_);
+  open_ = true;
+  connected_.set_value();  // Release successfully the Connect() method
+}
+
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::OnClientClose(
+    websocketpp::connection_hdl) {
+  spdlog::debug("transport: websocket client on close is called");
+  scoped_lock_t guard(lock_);
+  done_ = true;
+}
+
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::OnClientFail(
+    websocketpp::connection_hdl) {
+  spdlog::debug("transport: websocket client on fail is called");
+
+  // If failed callback is called but open callback wasn't called (open ==
+  // false) than we have a connection problem.
+  if (!open_) {
+    connected_.set_exception(std::make_exception_ptr(
+        NetworkError(ErrorMessages::kTransportConnectionFailed)));
+  }
+
+  spdlog::error("transport: websocket client failed");
+
+  scoped_lock_t guard(lock_);
+  done_ = true;
+}
+
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::OnClientMessage(
+    websocketpp::connection_hdl, message_ptr_t msg) {
+  spdlog::debug("transport: websocket client on message is called");
+  if (msg->get_opcode() != websocketpp::frame::opcode::text) {
+    spdlog::error("unsupported binary data");
+    // TODO(DGL) What should we do now? Raise ProtocolError?
+    return;
+  }
+  RecvMessage(msg->get_payload());
+}
+
+template <typename CONFIG>
+inline void WebSocketTransport<CONFIG>::StopClient(
     const std::string& reason) noexcept {
+  spdlog::debug("transport: websocket client is stopping");
   // Leave if we closed already, e.g. with Disconnect()
   if (done_) {
     return;
@@ -191,17 +271,20 @@ void WebSocketTransport<CONFIG>::StopClient(
   thread_->join();
 
   open_ = false;
+
+  spdlog::debug("transport: websocket client is stopped");
 }
 
 template <typename CONFIG>
-void WebSocketTransport<CONFIG>::RecvMessage(const std::string& payload) {
+inline void WebSocketTransport<CONFIG>::RecvMessage(
+    const std::string& payload) {
   if (!handler_) {
     spdlog::error("no transport handler attached");
     // TODO(DGL) What should we do now? Raise an error?
     return;
   }
 
-  spdlog::debug("got message: {}", payload);
+  spdlog::debug("transport: message received: {}", payload);
 
   // Parse the message.
   // TODO(DGL) We should create a Codec class

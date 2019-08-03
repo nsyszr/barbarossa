@@ -39,13 +39,10 @@ int main(int argc, char* argv[]) {
   client_t client;
   client.init_asio(&io_context);
 
-  // Start our ASIO io_context in background;
-  std::thread t([&io_context]() { io_context.run(); });
-
   // Our websocket runs over TLS and therefore it's required to setup a TLS init
   // handler for the websocketpp implementation.
   client.set_tls_init_handler([](websocketpp::connection_hdl) {
-    spdlog::debug("endpoint tls init handler called");
+    spdlog::debug("main: websocket client tls init handler called");
     context_ptr ctx =
         std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
 
@@ -60,13 +57,16 @@ int main(int argc, char* argv[]) {
     return ctx;
   });
 
-  // Create our control channel transport layer.
+  // Create our control channel transport layer. It has to be a shared pointer
+  // because we pass transport as shared pointer to OnAttach method of session.
   auto transport = std::make_shared<
       controlchannel::WebSocketTransport<websocketpp::config::asio_tls_client>>(
       client, argv[1]);
+  spdlog::debug("main: transport is created");
 
   // Create our control channel session layer.
   auto session = std::make_shared<controlchannel::Session>(io_context);
+  spdlog::debug("main: session is created");
 
   // Register operations
   session->RegisterOperation("say_hello", [](json&& arguments) {
@@ -81,6 +81,7 @@ int main(int argc, char* argv[]) {
 
     return result;
   });
+  spdlog::debug("main: session operations are registered");
 
   // Wire signal handler
   asio::signal_set signals(io_context, SIGINT, SIGTERM);
@@ -89,26 +90,50 @@ int main(int argc, char* argv[]) {
     session->Leave();  // TODO(DGL) Add leave message?
     io_context.stop();
   });
+  spdlog::debug("main: signal handler is created");
+
+  // Wire transport and session layer together
+  transport->Attach(
+      std::static_pointer_cast<controlchannel::TransportHandler>(session));
+  spdlog::debug("main: transport is attached to session");
 
   try {
-    // Wire transport and session layer together and connect to the server.
-    transport->Attach(
-        std::static_pointer_cast<controlchannel::TransportHandler>(session));
+    // Connect the control channel server
     transport->Connect();
-    spdlog::debug("transport connected");
+    spdlog::debug("main: transport is connected");
 
     // Start the session by joining it
     session->Join(argv[2]);
-    spdlog::debug("session joined");
+    spdlog::debug("main: session is joined");
 
     // Blocking
     session->Listen();
+  } catch (const controlchannel::AbortError& e) {
+    spdlog::error("controlchannel aborted");
+    io_context.stop();
   } catch (const controlchannel::TimeoutError& e) {
     spdlog::error("controlchannel timeout");
     // TODO(DGL) Restart?
     io_context.stop();
+  } catch (const controlchannel::NetworkError& e) {
+    spdlog::error("controlchannel network error");
+    // TODO(DGL) Restart?
+    io_context.stop();
   }
 
-  t.join();
+  // transport->Disconnect();
+  // spdlog::debug("main: transport is disconnected");
+  transport->Detach();
+  spdlog::debug("main: transport is detached from session");
+
+  // Start our ASIO io_context in background. The run method is confusing! Our
+  // application is already running above. The run method ensures that the
+  // asio context is properly cleaned up before leaving the app.
+  io_context.run();
+  // std::thread t([&io_context]() { io_context.run(); });
+  // t.join();
+
+  spdlog::debug("main: exit");
+
   return 0;
 }

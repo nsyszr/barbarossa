@@ -46,11 +46,13 @@ class WebSocketTransport
   bool HasHandler() const override;
 
  private:
-  std::shared_ptr<WebSocketTransport<CONFIG>> GetSharedPtr() {
-    return this->shared_from_this();
-  }
   void StartClient();
   void StopClient(const std::string& reason) noexcept;
+  void OnClientOpen(websocketpp::connection_hdl hdl);
+  void OnClientClose(websocketpp::connection_hdl hdl);
+  void OnClientFail(websocketpp::connection_hdl hdl);
+  void OnClientMessage(websocketpp::connection_hdl hdl, message_ptr_t msg);
+
   void RecvMessage(const std::string& payload);
 
   client_t& client_;

@@ -26,6 +26,9 @@ class Message {
   explicit Message(std::size_t num_fields);
   explicit Message(MessageFields&& fields);
 
+  Message(const Message& other) = delete;
+  Message(Message&& other);
+
   Message& operator=(const Message& other) = delete;
   Message& operator=(Message&& other);
 

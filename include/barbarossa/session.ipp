@@ -34,41 +34,54 @@ inline Session::Session(asio::io_context& io_context)
     : io_context_(io_context),
       state_(SessionState::kClosed),
       session_id_(0),
-      request_timeout_(kSessionDefaultRequestTimeout) {}
+      request_timeout_(kSessionDefaultRequestTimeout) {
+  spdlog::debug("session: instance is created");
+}
 
 inline Session::~Session() {
   if (hearbeat_thread_.joinable()) {
     spdlog::debug("wait for heartbeat thread to finish");
     hearbeat_thread_.join();
   }
+  spdlog::debug("session: instance is destroyed");
 }
 
 inline uint32_t Session::Join(const std::string& realm) {
-  spdlog::info("session join started");
+  spdlog::debug("session: joining");
 
-  Message hello_message(2);
-  hello_message.SetField<MessageType>(0, MessageType::kHello);
-  hello_message.SetField<std::string>(1, realm);
+  auto hello_message = std::make_shared<Message>(Message(2));
+  hello_message->SetField<MessageType>(0, MessageType::kHello);
+  hello_message->SetField<std::string>(1, realm);
 
   // Set the current state to ESTABLISHING
   EnsureState(SessionState::kEstablishing);
 
   // We use dispatch to synchronously send the message in the current thread.
   // After execution we can expect that the message is on the wire.
-  auto self(shared_from_this());
-  asio::dispatch(io_context_, [this, self, &hello_message]() {
+  // auto self(shared_from_this());
+  auto weak_self = std::weak_ptr<Session>(this->shared_from_this());
+
+  asio::dispatch(io_context_, [=]() {
+    spdlog::debug("session: join dispatching");
+    auto shared_self = weak_self.lock();
+    if (!shared_self) {
+      return;
+    }
+
     if (session_id_) {
       joined_.set_exception(std::make_exception_ptr(
           std::logic_error(ErrorMessages::kSessionAlreadyJoined)));
+      spdlog::debug("session dispatch join is exited");
       return;
     }
 
     try {
       // Note that in this case an established session isn't required.
-      SendMessage(std::move(hello_message), false);
+      SendMessage(std::move(*hello_message), false);
     } catch (std::exception& e) {
       joined_.set_exception(std::make_exception_ptr(e));
     }
+    spdlog::debug("session: join dispatched");
   });
 
   auto joined_future = joined_.get_future();
@@ -85,6 +98,10 @@ inline uint32_t Session::Join(const std::string& realm) {
 inline void Session::Leave() {
   // stop_signal_.notify_all();
   leaved_.set_value(true);
+
+  // TODO(DGL) This call is perhaps critical because of depending background
+  // threads. Check this!
+  transport_->Disconnect();
 }
 
 inline void Session::OnAttach(const std::shared_ptr<Transport>& transport) {
@@ -118,7 +135,7 @@ inline void Session::OnDetach(const std::string& /*reason*/) {
 }
 
 inline void Session::OnMessage(Message&& message) {
-  spdlog::debug("session received message");
+  spdlog::debug("session: message is received");
 
   if (message.Size() < 1) {
     // throw ProtocolError(ErrorMessages::kInvalidMessageStructure);
@@ -136,7 +153,7 @@ inline void Session::OnMessage(Message&& message) {
       ProcessWelcomeMessage(std::move(message));
       break;
     case MessageType::kAbort:
-      // abort session, throw AbortError
+      ProcessAbortMessage(std::move(message));
       break;
     case MessageType::kPing:
       throw ProtocolError("client received PING message");
@@ -164,7 +181,7 @@ inline void Session::OnMessage(Message&& message) {
 
 inline void Session::EnsureState(SessionState state) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  spdlog::debug("session change state from {} to {}", state_, state);
+  spdlog::debug("session: change state from {} to {}", state_, state);
   state_ = state;
 }
 
@@ -184,6 +201,7 @@ inline void Session::SendMessage(Message&& message, bool session_established) {
     throw NoSessionError();
   }
 
+  // Throws NetworkError
   transport_->SendMessage(std::move(message));
 }
 
@@ -207,9 +225,17 @@ inline void Session::ProcessWelcomeMessage(Message&& message) {
   joined_.set_value(session_id_);
 }
 
-inline void Session::ProcessPongMessage(Message&& message) {
-  spdlog::debug("handle pong message");
-  hearbeat_alive_.set_value(true);
+inline void Session::ProcessAbortMessage(Message&& message) {
+  // TODO(DGL) Abort message spec has a 3rd field with reason. Add this to the
+  //           exception, tool.
+  // TODO(DGL) Should we close the connection here, too?
+  auto reason = message.Field<std::string>(1);
+  joined_.set_exception(std::make_exception_ptr(AbortError(reason)));
+}
+
+inline void Session::ProcessPongMessage(Message&&) {
+  spdlog::debug("session pong message is handled");
+  pong_received_.set_value(true);
 }
 
 inline void Session::ProcessCallMessage(Message&& message) {
@@ -226,7 +252,7 @@ inline void Session::ProcessCallMessage(Message&& message) {
   if (it != operations_.end()) {
     auto result = it->second(std::move(arguments));
 
-    spdlog::debug("call message processed: {}", result.dump());
+    spdlog::debug("session: call message processed: {}", result.dump());
 
     Message result_message(3);
     result_message.SetField<MessageType>(0, MessageType::kResult);
@@ -249,12 +275,12 @@ inline void Session::ProcessCallMessage(Message&& message) {
 }
 
 inline void Session::HearbeatController() {
-  spdlog::debug("hearbeat: controller thread start");
+  spdlog::debug("session: hearbeat controller is started");
 
-  auto leaved_future = leaved_.get_future();
+  // auto leaved_future = leaved_.get_future();
   while (true) {
     std::unique_lock<std::mutex> lock(stop_signal_mutex_);
-    spdlog::debug("heartbeat: wait until sending ping or die.");
+    spdlog::debug("session: heartbeat wait until sending ping or die.");
 
     // We send every given seconds a ping or we stop the hearbeat
     if (stop_signal_.wait_for(lock, std::chrono::seconds(20)) ==
@@ -265,46 +291,58 @@ inline void Session::HearbeatController() {
       break;  // Exit the loop because stop_signal_ is set
     }
 
-    Message ping_message(2);
-    ping_message.SetField<MessageType>(0, MessageType::kPing);
-    ping_message.SetField<json::object_t>(1, json::object());
+    auto ping_message = std::make_shared<Message>(2);
+    ping_message->SetField<MessageType>(0, MessageType::kPing);
+    ping_message->SetField<json::object_t>(1, json::object());
 
     // Dispatch the ping message
-    auto self(shared_from_this());
-    asio::dispatch(io_context_, [this, self, &ping_message]() {
+    auto weak_self = std::weak_ptr<Session>(this->shared_from_this());
+    asio::dispatch(io_context_, [=]() {
+      auto shared_self = weak_self.lock();
+      if (!shared_self) {
+        return;
+      }
+
       try {
-        // Note that in this case an established session isn't required.
-        SendMessage(std::move(ping_message), true);
-      } catch (std::exception& e) {
-        hearbeat_alive_.set_exception(std::make_exception_ptr(e));
+        SendMessage(std::move(*ping_message), true);
+      } catch (const NetworkError& e) {
+        spdlog::debug("session: heartbeat failed to send message");
+        pong_received_.set_value(false);
+        leaved_.set_exception(std::make_exception_ptr(e));
       }
     });
 
+    spdlog::debug("session: heartbeat wait_for ping_received_future");
+
     // Wait for our pong message
-    auto f = hearbeat_alive_.get_future();
-    if (f.wait_for(std::chrono::seconds(4)) == std::future_status::timeout) {
+    auto pong_received_future = pong_received_.get_future();
+
+    // The future wait_for can raise an exception, e.g. if send message above
+    // fails.
+    if (pong_received_future.wait_for(std::chrono::seconds(4)) ==
+        std::future_status::timeout) {
       spdlog::error("heartbeat timeout");
       // Set our heartbeat alive promise to false! This tells our routine that
       // a timeout happend!
-      hearbeat_alive_.set_value(false);
+      pong_received_.set_value(false);
     }
 
-    // If everything is fine get() doesn't block, but can raise an exception
     try {
-      // If our future is false, then it's set above because of timeout!
-      if (!f.get()) {
+      // If everything is fine get() doesn't block, but can raise an exception.
+      // If the future is false, then it's set above because of timeout!
+      if (!pong_received_future.get()) {
         leaved_.set_exception(std::make_exception_ptr(TimeoutError()));
         break;
       }
-    } catch (std::exception& e) {
+    } catch (const NetworkError& e) {
       leaved_.set_exception(std::make_exception_ptr(e));
     }
 
     // Reset the promise for the next pong
-    hearbeat_alive_ = std::promise<bool>();
+    pong_received_ = std::promise<bool>();
   }
 
-  spdlog::debug("heartbeat terminated");
+  spdlog::debug("session heartbeat controller is terminated");
 }
 
 }  // namespace barbarossa::controlchannel

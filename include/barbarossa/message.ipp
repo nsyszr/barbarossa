@@ -15,6 +15,8 @@ inline Message::Message(std::size_t num_fields) : fields_(num_fields) {}
 
 inline Message::Message(MessageFields&& fields) : fields_(std::move(fields)) {}
 
+inline Message::Message(Message&& other) { fields_ = std::move(other.fields_); }
+
 inline Message& Message::operator=(Message&& other) {
   if (this == &other) {
     return *this;
